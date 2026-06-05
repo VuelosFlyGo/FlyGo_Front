@@ -5,6 +5,8 @@ import '../widgets/vuelo_card.dart';
 import 'reservas_page.dart';
 import 'seleccion_asientos_page.dart';
 import 'crear_vuelo_page.dart';
+import 'login_page.dart';
+import '../services/auth_service.dart';
 
 class VuelosPage extends StatefulWidget {
   const VuelosPage({super.key});
@@ -114,6 +116,18 @@ class _VuelosPageState extends State<VuelosPage> {
               },
               icon: const Icon(Icons.add),
               tooltip: "Crear vuelo",
+            ),
+            IconButton(
+              onPressed: () async {
+                final navigator = Navigator.of(context);
+                await AuthService().logout();
+                navigator.pushAndRemoveUntil(
+                  MaterialPageRoute(builder: (_) => const LoginPage()),
+                  (route) => false,
+                );
+              },
+              icon: const Icon(Icons.logout),
+              tooltip: "Cerrar sesión",
             ),
           ],
       ),

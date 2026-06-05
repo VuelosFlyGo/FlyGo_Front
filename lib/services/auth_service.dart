@@ -35,4 +35,21 @@ class AuthService {
 
     throw Exception("Usuario o contraseña incorrectos");
   }
+
+  Future<void> logout() async {
+    final url = Uri.parse("${ApiConfig.baseUrl}/api/auth/logout");
+    try {
+      await http.post(
+        url,
+        headers: {
+          "Content-Type": "application/json",
+          "Authorization": "Bearer ${ApiConfig.token}"
+        },
+      );
+    } catch (_) {
+      // Ignore network errors to ensure local logout still completes
+    } finally {
+      ApiConfig.token = "";
+    }
+  }
 }
