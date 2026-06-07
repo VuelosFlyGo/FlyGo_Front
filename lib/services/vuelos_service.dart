@@ -4,11 +4,17 @@ import '../config/api_config.dart';
 import '../models/vuelo.dart';
 
 class VuelosService {
-  Future<List<Vuelo>> buscarVuelos({String? origen, String? destino, String? fecha}) async {
+  Future<List<Vuelo>> buscarVuelos({
+    String? origen,
+    String? destino,
+    String? fechaInicio,
+    String? fechaFin,
+  }) async {
     final params = <String, String>{};
     if (origen != null && origen.isNotEmpty) params["origen"] = origen;
     if (destino != null && destino.isNotEmpty) params["destino"] = destino;
-    if (fecha != null && fecha.isNotEmpty) params["fecha"] = fecha;
+    if (fechaInicio != null && fechaInicio.isNotEmpty) params["fecha_inicio"] = fechaInicio;
+    if (fechaFin != null && fechaFin.isNotEmpty) params["fecha_fin"] = fechaFin;
 
     final uri = Uri.parse("${ApiConfig.baseUrl}/api/vuelos").replace(queryParameters: params);
 

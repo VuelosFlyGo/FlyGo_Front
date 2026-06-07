@@ -1,5 +1,6 @@
 class Reserva {
   final int id;
+  final int vueloId;
   final String codigoReserva;
   final int cantidadAsientos;
   final double total;
@@ -15,6 +16,7 @@ class Reserva {
 
   Reserva({
     required this.id,
+    required this.vueloId,
     required this.codigoReserva,
     required this.cantidadAsientos,
     required this.total,
@@ -32,6 +34,7 @@ class Reserva {
   factory Reserva.fromJson(Map<String, dynamic> json) {
     return Reserva(
       id: json["id"],
+      vueloId: json["vuelo_id"] ?? 0,
       codigoReserva: json["codigo_reserva"],
       cantidadAsientos: json["cantidad_asientos"],
       total: (json["total"] as num).toDouble(),

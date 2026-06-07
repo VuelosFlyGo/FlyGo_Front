@@ -30,6 +30,7 @@ class AuthService {
     if (response.statusCode == 200) {
       final loginResponse = LoginResponse.fromJson(jsonDecode(response.body));
       ApiConfig.token = loginResponse.token;
+      ApiConfig.rol = loginResponse.rol;
       return loginResponse;
     }
 
@@ -50,6 +51,7 @@ class AuthService {
       // Ignore network errors to ensure local logout still completes
     } finally {
       ApiConfig.token = "";
+      ApiConfig.rol = "cliente";
     }
   }
 }

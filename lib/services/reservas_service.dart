@@ -61,6 +61,26 @@ class ReservasService {
     }
   }
 
+  Future<void> actualizarReservaAsientos(int reservaId, List<String> asientos) async {
+    final url = Uri.parse("${ApiConfig.baseUrl}/api/reservas/$reservaId/asientos");
+
+    final response = await http.put(
+      url,
+      headers: {
+        "Content-Type": "application/json",
+        "Authorization": "Bearer ${ApiConfig.token}",
+      },
+      body: jsonEncode({
+        "asientos": asientos,
+      }),
+    );
+
+    if (response.statusCode != 200) {
+      final mensaje = _obtenerMensajeError(response.body);
+      throw Exception(mensaje);
+    }
+  }
+
   String _obtenerMensajeError(String body) {
     try {
       final data = jsonDecode(body);

@@ -9,4 +9,5 @@ class ApiConfig {
   // static const String baseUrl = "https://tu-api.onrender.com";
 
   static String token = "";
+  static String rol = "cliente";
 }
