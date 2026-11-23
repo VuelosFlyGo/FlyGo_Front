@@ -1,11 +1,11 @@
 {
-    "name": "app_aerea",
-    "short_name": "app_aerea",
+    "name": "FlyGo",
+    "short_name": "FlyGo",
     "start_url": ".",
     "display": "standalone",
-    "background_color": "#0175C2",
-    "theme_color": "#0175C2",
-    "description": "A new Flutter project.",
+    "background_color": "#071A2E",
+    "theme_color": "#071A2E",
+    "description": "Encuentra y reserva vuelos disponibles con FlyGo.",
     "orientation": "portrait-primary",
     "prefer_related_applications": false,
     "icons": [

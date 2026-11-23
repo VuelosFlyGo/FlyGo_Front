@@ -10,7 +10,7 @@ dependencies:
   flutter:
     sdk: flutter
   http: ^1.6.0
-
+  shared_preferences: ^2.5.6
 dev_dependencies:
   flutter_test:
     sdk: flutter
@@ -18,3 +18,16 @@ dev_dependencies:
 
 flutter:
   uses-material-design: true
+  assets:
+    - assets/images/flygo-mark.png
+    - assets/images/flygo-hero.png
+    - assets/images/flygo-plane-hero.png
+    - assets/images/flygo-plane-cutout.png
+    - assets/images/flygo-sky-background.png
+  fonts:
+    - family: SpaceGrotesk
+      fonts:
+        - asset: assets/fonts/SpaceGrotesk-Regular.ttf
+          weight: 400
+        - asset: assets/fonts/SpaceGrotesk-Bold.ttf
+          weight: 700

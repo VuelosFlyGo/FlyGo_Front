@@ -4,6 +4,7 @@ class Reserva {
   final String codigoReserva;
   final int cantidadAsientos;
   final double total;
+  final double precioActual;
   final String estado;
   final String fechaReserva;
   final String aerolinea;
@@ -13,6 +14,7 @@ class Reserva {
   final String horaSalida;
   final String horaLlegada;
   final List<String> asientos;
+  final bool modificada;
 
   Reserva({
     required this.id,
@@ -20,6 +22,7 @@ class Reserva {
     required this.codigoReserva,
     required this.cantidadAsientos,
     required this.total,
+    required this.precioActual,
     required this.estado,
     required this.fechaReserva,
     required this.aerolinea,
@@ -29,6 +32,7 @@ class Reserva {
     required this.horaSalida,
     required this.horaLlegada,
     required this.asientos,
+    required this.modificada,
   });
 
   factory Reserva.fromJson(Map<String, dynamic> json) {
@@ -38,6 +42,11 @@ class Reserva {
       codigoReserva: json["codigo_reserva"],
       cantidadAsientos: json["cantidad_asientos"],
       total: (json["total"] as num).toDouble(),
+      precioActual: (json["precio_actual"] as num?)?.toDouble() ??
+          ((json["cantidad_asientos"] as int? ?? 0) > 0
+              ? (json["total"] as num).toDouble() /
+                  (json["cantidad_asientos"] as int)
+              : 0),
       estado: json["estado"],
       fechaReserva: json["fecha_reserva"],
       aerolinea: json["aerolinea"],
@@ -46,9 +55,9 @@ class Reserva {
       fechaVuelo: json["fecha_vuelo"],
       horaSalida: json["hora_salida"],
       horaLlegada: json["hora_llegada"],
-      asientos: json["asientos"] == null
-          ? []
-          : List<String>.from(json["asientos"]),
+      asientos:
+          json["asientos"] == null ? [] : List<String>.from(json["asientos"]),
+      modificada: json["modificada"] == true,
     );
   }
 }

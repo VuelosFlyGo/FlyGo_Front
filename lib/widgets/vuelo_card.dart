@@ -1,16 +1,19 @@
 import 'package:flutter/material.dart';
 import '../config/api_config.dart';
 import '../models/vuelo.dart';
+import '../theme/aerotech_theme.dart';
 
 class VueloCard extends StatelessWidget {
   final Vuelo vuelo;
   final VoidCallback onReservar;
+  final VoidCallback? onEditar;
   final VoidCallback? onEliminar;
 
   const VueloCard({
     super.key,
     required this.vuelo,
     required this.onReservar,
+    this.onEditar,
     this.onEliminar,
   });
 
@@ -18,14 +21,18 @@ class VueloCard extends StatelessWidget {
   Widget build(BuildContext context) {
     final String fechaStr = vuelo.fecha;
     final String horaStr = vuelo.horaSalida.substring(0, 5);
-    final DateTime? departureTime = DateTime.tryParse("${fechaStr}T$horaStr:00");
-    final bool estaFinalizado = departureTime != null && departureTime.isBefore(DateTime.now());
+    final DateTime? departureTime =
+        DateTime.tryParse("${fechaStr}T$horaStr:00");
+    final bool estaFinalizado =
+        departureTime != null && departureTime.isBefore(DateTime.now());
 
     final seatsColor = estaFinalizado
-        ? Colors.grey.shade600
+        ? AeroColors.muted
         : (vuelo.asientosDisponibles > 10
-            ? Colors.green.shade700
-            : (vuelo.asientosDisponibles > 0 ? Colors.orange.shade700 : Colors.red.shade700));
+            ? AeroColors.emerald
+            : (vuelo.asientosDisponibles > 0
+                ? Colors.orange.shade700
+                : AeroColors.coral));
 
     final bool esAdmin = ApiConfig.rol == "admin";
 
@@ -33,10 +40,11 @@ class VueloCard extends StatelessWidget {
       margin: const EdgeInsets.only(bottom: 16),
       decoration: BoxDecoration(
         color: Colors.white,
-        borderRadius: BorderRadius.circular(16),
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(color: AeroColors.line),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(0.04),
+            color: AeroColors.navy.withValues(alpha: 0.05),
             blurRadius: 10,
             offset: const Offset(0, 4),
           ),
@@ -51,7 +59,7 @@ class VueloCard extends StatelessWidget {
               // Carrier/Aesthetic Left indicator
               Container(
                 width: 6,
-                color: esAdmin ? Colors.red.shade600 : Colors.blue.shade700,
+                color: esAdmin ? AeroColors.coral : AeroColors.cyan,
               ),
               Expanded(
                 child: Padding(
@@ -65,14 +73,15 @@ class VueloCard extends StatelessWidget {
                           children: [
                             Row(
                               children: [
-                                Icon(Icons.flight_takeoff, color: Colors.blue.shade700, size: 20),
+                                const Icon(Icons.flight_takeoff,
+                                    color: AeroColors.cyan, size: 20),
                                 const SizedBox(width: 8),
                                 Text(
                                   vuelo.aerolinea,
                                   style: TextStyle(
                                     fontSize: 14,
                                     fontWeight: FontWeight.bold,
-                                    color: Colors.grey.shade800,
+                                    color: AeroColors.ink,
                                   ),
                                 ),
                               ],
@@ -102,7 +111,8 @@ class VueloCard extends StatelessWidget {
                                 ),
                                 const Padding(
                                   padding: EdgeInsets.symmetric(horizontal: 12),
-                                  child: Icon(Icons.arrow_forward, color: Colors.grey, size: 16),
+                                  child: Icon(Icons.flight,
+                                      color: AeroColors.cyan, size: 18),
                                 ),
                                 Column(
                                   crossAxisAlignment: CrossAxisAlignment.start,
@@ -129,7 +139,8 @@ class VueloCard extends StatelessWidget {
                             // Date & Seats Info
                             Row(
                               children: [
-                                Icon(Icons.calendar_today, size: 14, color: Colors.grey.shade600),
+                                Icon(Icons.calendar_today,
+                                    size: 14, color: Colors.grey.shade600),
                                 const SizedBox(width: 4),
                                 Text(
                                   vuelo.fecha,
@@ -139,10 +150,13 @@ class VueloCard extends StatelessWidget {
                                   ),
                                 ),
                                 const SizedBox(width: 16),
-                                Icon(Icons.event_seat, size: 14, color: seatsColor),
+                                Icon(Icons.event_seat,
+                                    size: 14, color: seatsColor),
                                 const SizedBox(width: 4),
                                 Text(
-                                  estaFinalizado ? "Finalizado" : "${vuelo.asientosDisponibles} disp.",
+                                  estaFinalizado
+                                      ? "Finalizado"
+                                      : "${vuelo.asientosDisponibles} disp.",
                                   style: TextStyle(
                                     fontSize: 12,
                                     fontWeight: FontWeight.w600,
@@ -164,28 +178,58 @@ class VueloCard extends StatelessWidget {
                             style: TextStyle(
                               fontSize: 20,
                               fontWeight: FontWeight.bold,
-                              color: Colors.blue.shade900,
+                              color: AeroColors.navy,
                             ),
                           ),
                           const SizedBox(height: 12),
                           // Action button: Reservar for clients, Eliminar for admins
                           if (esAdmin)
-                            ElevatedButton.icon(
-                              style: ElevatedButton.styleFrom(
-                                backgroundColor: Colors.red.shade600,
-                                foregroundColor: Colors.white,
-                                elevation: 0,
-                                padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
-                                shape: RoundedRectangleBorder(
-                                  borderRadius: BorderRadius.circular(10),
+                            Column(
+                              children: [
+                                ElevatedButton.icon(
+                                  style: ElevatedButton.styleFrom(
+                                    backgroundColor: AeroColors.navy,
+                                    foregroundColor: AeroColors.cyan,
+                                    elevation: 0,
+                                    padding: const EdgeInsets.symmetric(
+                                        horizontal: 14, vertical: 8),
+                                    shape: RoundedRectangleBorder(
+                                      borderRadius: BorderRadius.circular(10),
+                                    ),
+                                  ),
+                                  onPressed: onEditar,
+                                  icon:
+                                      const Icon(Icons.edit_outlined, size: 16),
+                                  label: const Text(
+                                    "Editar",
+                                    style: TextStyle(
+                                        fontSize: 14,
+                                        fontWeight: FontWeight.bold),
+                                  ),
                                 ),
-                              ),
-                              onPressed: onEliminar,
-                              icon: const Icon(Icons.delete_forever, size: 16),
-                              label: const Text(
-                                "Eliminar",
-                                style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold),
-                              ),
+                                const SizedBox(height: 8),
+                                OutlinedButton.icon(
+                                  style: OutlinedButton.styleFrom(
+                                    foregroundColor: Colors.red.shade700,
+                                    side:
+                                        BorderSide(color: Colors.red.shade200),
+                                    padding: const EdgeInsets.symmetric(
+                                        horizontal: 12, vertical: 8),
+                                    shape: RoundedRectangleBorder(
+                                      borderRadius: BorderRadius.circular(10),
+                                    ),
+                                  ),
+                                  onPressed: onEliminar,
+                                  icon: const Icon(Icons.delete_outline,
+                                      size: 16),
+                                  label: const Text(
+                                    "Eliminar",
+                                    style: TextStyle(
+                                        fontSize: 14,
+                                        fontWeight: FontWeight.bold),
+                                  ),
+                                ),
+                              ],
                             )
                           else if (estaFinalizado)
                             ElevatedButton(
@@ -193,7 +237,8 @@ class VueloCard extends StatelessWidget {
                                 backgroundColor: Colors.grey.shade400,
                                 foregroundColor: Colors.white,
                                 elevation: 0,
-                                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                                padding: const EdgeInsets.symmetric(
+                                    horizontal: 16, vertical: 8),
                                 shape: RoundedRectangleBorder(
                                   borderRadius: BorderRadius.circular(10),
                                 ),
@@ -201,16 +246,18 @@ class VueloCard extends StatelessWidget {
                               onPressed: null,
                               child: const Text(
                                 "Finalizado",
-                                style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold),
+                                style: TextStyle(
+                                    fontSize: 14, fontWeight: FontWeight.bold),
                               ),
                             )
                           else
                             ElevatedButton(
                               style: ElevatedButton.styleFrom(
-                                backgroundColor: Colors.blue.shade700,
+                                backgroundColor: AeroColors.navy,
                                 foregroundColor: Colors.white,
                                 elevation: 0,
-                                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                                padding: const EdgeInsets.symmetric(
+                                    horizontal: 16, vertical: 8),
                                 shape: RoundedRectangleBorder(
                                   borderRadius: BorderRadius.circular(10),
                                 ),
@@ -218,7 +265,8 @@ class VueloCard extends StatelessWidget {
                               onPressed: onReservar,
                               child: const Text(
                                 "Reservar",
-                                style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold),
+                                style: TextStyle(
+                                    fontSize: 14, fontWeight: FontWeight.bold),
                               ),
                             ),
                         ],

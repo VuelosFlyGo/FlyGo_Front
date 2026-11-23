@@ -30,6 +30,14 @@ migrate_working_dir/
 .pub-cache/
 .pub/
 /build/
+/build_web_verified/
+/build_web_verified2/
+/.impeccable/
+
+# Local web server logs
+web-*.stdout.log
+web-*.stderr.log
+*.pdf
 
 # Symbolication related
 app.*.symbols

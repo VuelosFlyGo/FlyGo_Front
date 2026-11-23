@@ -31,7 +31,8 @@ class _RegistroPageState extends State<RegistroPage> {
     final coeficientes = [2, 1, 2, 1, 2, 1, 2, 1, 2];
     int suma = 0;
     for (int i = 0; i < 9; i++) {
-      int valor = (int.tryParse(cedula.substring(i, i + 1)) ?? 0) * coeficientes[i];
+      int valor =
+          (int.tryParse(cedula.substring(i, i + 1)) ?? 0) * coeficientes[i];
       if (valor >= 10) valor -= 9;
       suma += valor;
     }
@@ -50,7 +51,11 @@ class _RegistroPageState extends State<RegistroPage> {
     final correo = correoCtrl.text.trim();
     final cedula = cedulaCtrl.text.trim();
 
-    if (usuario.isEmpty || password.isEmpty || nombre.isEmpty || correo.isEmpty || cedula.isEmpty) {
+    if (usuario.isEmpty ||
+        password.isEmpty ||
+        nombre.isEmpty ||
+        correo.isEmpty ||
+        cedula.isEmpty) {
       setState(() => mensaje = "Todos los campos son obligatorios.");
       return;
     }
@@ -61,7 +66,8 @@ class _RegistroPageState extends State<RegistroPage> {
     }
 
     if (password.length < 6) {
-      setState(() => mensaje = "La contraseña debe tener al menos 6 caracteres.");
+      setState(
+          () => mensaje = "La contraseña debe tener al menos 6 caracteres.");
       return;
     }
 
@@ -72,7 +78,8 @@ class _RegistroPageState extends State<RegistroPage> {
 
     final emailRegExp = RegExp(r'^[\w-\.]+@([\w-]+\.)+[\w-]{2,4}$');
     if (!emailRegExp.hasMatch(correo)) {
-      setState(() => mensaje = "El correo electrónico no tiene un formato válido.");
+      setState(
+          () => mensaje = "El correo electrónico no tiene un formato válido.");
       return;
     }
 
@@ -109,9 +116,12 @@ class _RegistroPageState extends State<RegistroPage> {
       );
       Navigator.pop(context);
     } catch (e) {
-      setState(() => mensaje = "No se pudo registrar: ${e.toString().replaceAll('Exception: ', '')}");
+      if (!mounted) return;
+      setState(
+        () => mensaje = e.toString().replaceAll("Exception: ", ""),
+      );
     } finally {
-      setState(() => cargando = false);
+      if (mounted) setState(() => cargando = false);
     }
   }
 
@@ -211,7 +221,8 @@ class _RegistroPageState extends State<RegistroPage> {
                     const SizedBox(height: 8),
                     Text(
                       "Complete los siguientes datos para comenzar a reservar vuelos.",
-                      style: TextStyle(fontSize: 14, color: Colors.grey.shade600),
+                      style:
+                          TextStyle(fontSize: 14, color: Colors.grey.shade600),
                     ),
                     const Divider(height: 32, thickness: 1.2),
                     inputField(
@@ -237,7 +248,8 @@ class _RegistroPageState extends State<RegistroPage> {
                       label: "Nombre completo",
                       icon: Icons.badge_outlined,
                       inputFormatters: [
-                        FilteringTextInputFormatter.allow(RegExp(r'[a-zA-ZáéíóúÁÉÍÓÚñÑ ]')),
+                        FilteringTextInputFormatter.allow(
+                            RegExp(r'[a-zA-ZáéíóúÁÉÍÓÚñÑ ]')),
                         LengthLimitingTextInputFormatter(50),
                       ],
                     ),
@@ -277,7 +289,8 @@ class _RegistroPageState extends State<RegistroPage> {
                         onPressed: cargando ? null : registrar,
                         child: Text(
                           cargando ? "Registrando..." : "Registrar",
-                          style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+                          style: const TextStyle(
+                              fontSize: 16, fontWeight: FontWeight.bold),
                         ),
                       ),
                     ),
@@ -292,12 +305,14 @@ class _RegistroPageState extends State<RegistroPage> {
                         ),
                         child: Row(
                           children: [
-                            Icon(Icons.error_outline, color: Colors.red.shade700, size: 20),
+                            Icon(Icons.error_outline,
+                                color: Colors.red.shade700, size: 20),
                             const SizedBox(width: 8),
                             Expanded(
                               child: Text(
                                 mensaje,
-                                style: TextStyle(color: Colors.red.shade900, fontSize: 13),
+                                style: TextStyle(
+                                    color: Colors.red.shade900, fontSize: 13),
                               ),
                             ),
                           ],
