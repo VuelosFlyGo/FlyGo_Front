@@ -19,14 +19,10 @@ class VueloCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final String fechaStr = vuelo.fecha;
-    final String horaStr = vuelo.horaSalida.substring(0, 5);
-    final DateTime? departureTime =
-        DateTime.tryParse("${fechaStr}T$horaStr:00");
-    final bool estaFinalizado =
-        departureTime != null && departureTime.isBefore(DateTime.now());
+    final bool estaFinalizado = vuelo.situacion == "FINALIZADO";
+    final bool estaInactivo = vuelo.situacion == "INACTIVO";
 
-    final seatsColor = estaFinalizado
+    final seatsColor = (estaFinalizado || estaInactivo)
         ? AeroColors.muted
         : (vuelo.asientosDisponibles > 10
             ? AeroColors.emerald
@@ -78,7 +74,7 @@ class VueloCard extends StatelessWidget {
                                 const SizedBox(width: 8),
                                 Text(
                                   vuelo.aerolinea,
-                                  style: TextStyle(
+                                  style: const TextStyle(
                                     fontSize: 14,
                                     fontWeight: FontWeight.bold,
                                     color: AeroColors.ink,
@@ -154,9 +150,13 @@ class VueloCard extends StatelessWidget {
                                     size: 14, color: seatsColor),
                                 const SizedBox(width: 4),
                                 Text(
-                                  estaFinalizado
-                                      ? "Finalizado"
-                                      : "${vuelo.asientosDisponibles} disp.",
+                                  estaInactivo
+                                      ? "Inactivo"
+                                      : estaFinalizado
+                                          ? "Finalizado"
+                                          : vuelo.situacion == "AGOTADO"
+                                              ? "Agotado"
+                                              : "${vuelo.asientosDisponibles} disp.",
                                   style: TextStyle(
                                     fontSize: 12,
                                     fontWeight: FontWeight.w600,
@@ -175,15 +175,16 @@ class VueloCard extends StatelessWidget {
                         children: [
                           Text(
                             "\$${vuelo.precio.toStringAsFixed(2)}",
-                            style: TextStyle(
+                            style: const TextStyle(
                               fontSize: 20,
                               fontWeight: FontWeight.bold,
                               color: AeroColors.navy,
                             ),
                           ),
                           const SizedBox(height: 12),
-                          // Action button: Reservar for clients, Eliminar for admins
-                          if (esAdmin)
+                          // El administrador desactiva lógicamente; no se borra
+                          // el historial ni sus reservas relacionadas.
+                          if (esAdmin && !estaInactivo)
                             Column(
                               children: [
                                 ElevatedButton.icon(
@@ -223,7 +224,7 @@ class VueloCard extends StatelessWidget {
                                   icon: const Icon(Icons.delete_outline,
                                       size: 16),
                                   label: const Text(
-                                    "Eliminar",
+                                    "Desactivar",
                                     style: TextStyle(
                                         fontSize: 14,
                                         fontWeight: FontWeight.bold),
@@ -231,6 +232,8 @@ class VueloCard extends StatelessWidget {
                                 ),
                               ],
                             )
+                          else if (esAdmin)
+                            const Chip(label: Text("Inactivo"))
                           else if (estaFinalizado)
                             ElevatedButton(
                               style: ElevatedButton.styleFrom(

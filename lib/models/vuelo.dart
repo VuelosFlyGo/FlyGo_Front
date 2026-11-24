@@ -9,6 +9,8 @@ class Vuelo {
   final double precio;
   final int asientosDisponibles;
   final int totalAsientos;
+  final bool estado;
+  final String situacion;
 
   Vuelo({
     required this.id,
@@ -21,6 +23,8 @@ class Vuelo {
     required this.precio,
     required this.asientosDisponibles,
     int? totalAsientos,
+    this.estado = true,
+    this.situacion = "VIGENTE",
   }) : totalAsientos = totalAsientos ?? asientosDisponibles;
 
   factory Vuelo.fromJson(Map<String, dynamic> json) {
@@ -35,6 +39,8 @@ class Vuelo {
       precio: (json["precio"] as num).toDouble(),
       asientosDisponibles: json["asientos_disponibles"],
       totalAsientos: json["total_asientos"],
+      estado: json["estado"] ?? true,
+      situacion: json["situacion"] ?? "VIGENTE",
     );
   }
 }

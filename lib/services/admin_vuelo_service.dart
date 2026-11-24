@@ -118,14 +118,14 @@ class AdminVueloService {
 
     if (response.statusCode == 409) {
       throw const ConflictoConcurrenciaException(
-        "El vuelo cambió mientras intentaba eliminarlo. La lista fue actualizada; revise su estado antes de volver a intentarlo.",
+        "El vuelo cambió mientras intentaba desactivarlo. La lista fue actualizada; revise su estado antes de volver a intentarlo.",
       );
     }
 
     try {
       final body = jsonDecode(response.body);
       final errorMsg =
-          body["detalle"] ?? body["error"] ?? "No se pudo eliminar el vuelo";
+          body["detalle"] ?? body["error"] ?? "No se pudo desactivar el vuelo";
       throw Exception(errorMsg);
     } catch (e) {
       if (e is Exception) rethrow;

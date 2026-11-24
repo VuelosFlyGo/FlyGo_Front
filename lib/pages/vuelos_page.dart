@@ -242,11 +242,11 @@ class _VuelosPageState extends State<VuelosPage> with RouteAware {
           children: [
             Icon(Icons.warning_amber_rounded, color: Colors.red, size: 28),
             SizedBox(width: 8),
-            Text("Eliminar Vuelo"),
+            Text("Desactivar vuelo"),
           ],
         ),
         content: Text(
-            "¿Está seguro de que desea eliminar el vuelo de ${vuelo.origen} a ${vuelo.destino} con ${vuelo.aerolinea}?"),
+            "¿Desea desactivar el vuelo de ${vuelo.origen} a ${vuelo.destino} con ${vuelo.aerolinea}? Dejará de mostrarse a los clientes, pero permanecerá en el historial administrativo."),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(context, false),
@@ -261,7 +261,7 @@ class _VuelosPageState extends State<VuelosPage> with RouteAware {
                   borderRadius: BorderRadius.circular(8)),
             ),
             onPressed: () => Navigator.pop(context, true),
-            child: const Text("Eliminar"),
+            child: const Text("Desactivar"),
           ),
         ],
       ),
@@ -276,7 +276,8 @@ class _VuelosPageState extends State<VuelosPage> with RouteAware {
         if (!mounted) return;
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: const Text("Vuelo eliminado correctamente."),
+            content: const Text(
+                "Vuelo desactivado. Se conserva en el historial administrativo."),
             backgroundColor: Colors.green.shade700,
             behavior: SnackBarBehavior.floating,
           ),
@@ -297,7 +298,7 @@ class _VuelosPageState extends State<VuelosPage> with RouteAware {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: Text(
-                "Error al eliminar vuelo: ${e.toString().replaceAll('Exception: ', '')}"),
+                "Error al desactivar vuelo: ${e.toString().replaceAll('Exception: ', '')}"),
             backgroundColor: Colors.red.shade700,
             behavior: SnackBarBehavior.floating,
           ),
@@ -484,9 +485,9 @@ class _VuelosPageState extends State<VuelosPage> with RouteAware {
           // Elegant Search Header
           Container(
             padding: const EdgeInsets.fromLTRB(16, 20, 16, 24),
-            decoration: BoxDecoration(
+            decoration: const BoxDecoration(
               color: AeroColors.ice,
-              border: const Border(bottom: BorderSide(color: AeroColors.line)),
+              border: Border(bottom: BorderSide(color: AeroColors.line)),
             ),
             child: Card(
               elevation: 0,
@@ -607,12 +608,13 @@ class _VuelosPageState extends State<VuelosPage> with RouteAware {
                           label: "Hacia",
                           icon: Icons.flight_land,
                           opciones: destinos);
-                      if (compact)
+                      if (compact) {
                         return Column(children: [
                           origin,
                           const SizedBox(height: 12),
                           destination
                         ]);
+                      }
                       return Row(children: [
                         Expanded(child: origin),
                         const SizedBox(width: 12),
@@ -635,9 +637,10 @@ class _VuelosPageState extends State<VuelosPage> with RouteAware {
                           icon: Icons.event_available,
                           readOnly: true,
                           onTap: () => _seleccionarFechaFin(context));
-                      if (compact)
+                      if (compact) {
                         return Column(
                             children: [start, const SizedBox(height: 12), end]);
+                      }
                       return Row(children: [
                         Expanded(child: start),
                         const SizedBox(width: 12),
