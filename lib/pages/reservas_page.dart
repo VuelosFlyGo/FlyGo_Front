@@ -1,9 +1,15 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
+import 'package:flutter/foundation.dart';
 import '../models/reserva.dart';
 import '../models/vuelo.dart';
 import '../pages/seleccion_asientos_page.dart';
 import '../services/reservas_service.dart';
+import '../services/session_service.dart';
+import '../utils/pdf_download.dart';
 import '../widgets/reserva_card.dart';
+import '../utils/navigation_observer.dart';
 
 class ReservasPage extends StatefulWidget {
   const ReservasPage({super.key});
@@ -12,24 +18,68 @@ class ReservasPage extends StatefulWidget {
   State<ReservasPage> createState() => _ReservasPageState();
 }
 
-class _ReservasPageState extends State<ReservasPage> {
+class _ReservasPageState extends State<ReservasPage> with RouteAware {
   final ReservasService reservasService = ReservasService();
   List<Reserva> reservas = [];
   bool cargando = true;
+  Completer<void>? _actualizacionActiva;
+  Timer? _temporizadorActualizacion;
+  bool _rutaVisible = true;
   String mensaje = "";
 
-  Future<void> cargar() async {
-    setState(() {
-      cargando = true;
-      mensaje = "";
-    });
+  String _firmaReservas(List<Reserva> lista) => lista
+      .map(
+        (r) =>
+            '${r.id}:${r.estado}:${r.total}:${r.modificada}:${r.asientos.join(',')}',
+      )
+      .join('|');
+
+  Future<void> cargar({bool silencioso = false}) async {
+    if (_actualizacionActiva != null) {
+      if (silencioso) return;
+      await _actualizacionActiva!.future;
+      if (!mounted) return;
+    }
+    final ciclo = Completer<void>();
+    _actualizacionActiva = ciclo;
+    if (!silencioso && mounted) {
+      setState(() {
+        cargando = true;
+        mensaje = "";
+      });
+    }
     try {
       final data = await reservasService.listarMisReservas();
+      if (!mounted) return;
+      final cambioRemoto = silencioso &&
+          reservas.isNotEmpty &&
+          _firmaReservas(reservas) != _firmaReservas(data);
       setState(() => reservas = data);
+      if (cambioRemoto && _rutaVisible) {
+        ScaffoldMessenger.of(context)
+          ..hideCurrentSnackBar()
+          ..showSnackBar(
+            const SnackBar(
+              content: Text(
+                "Una reserva cambió mientras esta pantalla estaba abierta. Actualizamos automáticamente su estado, asientos y total.",
+              ),
+              behavior: SnackBarBehavior.floating,
+            ),
+          );
+      }
+    } on SesionExpiradaException {
+      return;
     } catch (e) {
-      setState(() => mensaje = e.toString());
+      if (!mounted) return;
+      if (!silencioso) {
+        setState(
+          () => mensaje = e.toString().replaceFirst('Exception: ', ''),
+        );
+      }
     } finally {
-      setState(() => cargando = false);
+      ciclo.complete();
+      if (identical(_actualizacionActiva, ciclo)) _actualizacionActiva = null;
+      if (!silencioso && mounted) setState(() => cargando = false);
     }
   }
 
@@ -51,6 +101,16 @@ class _ReservasPageState extends State<ReservasPage> {
         ),
       );
       cargar();
+    } on ConflictoConcurrenciaException catch (e) {
+      await cargar(silencioso: true);
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(e.mensaje),
+          backgroundColor: Colors.orange.shade800,
+          behavior: SnackBarBehavior.floating,
+        ),
+      );
     } catch (e) {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
@@ -63,10 +123,93 @@ class _ReservasPageState extends State<ReservasPage> {
     }
   }
 
+  Future<void> descargarBoletos(Reserva reserva) async {
+    try {
+      final pdf = await reservasService.descargarBoletos(reserva.id);
+      descargarPdf(pdf, "flygo-${reserva.codigoReserva}.pdf");
+    } catch (error) {
+      if (!mounted) return;
+      final detalle = error.toString().replaceFirst("Exception: ", "");
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(detalle),
+          behavior: SnackBarBehavior.floating,
+          backgroundColor: Colors.red.shade700,
+        ),
+      );
+    }
+  }
+
+  Future<void> descargarFactura(Reserva reserva, {required bool xml}) async {
+    try {
+      final archivo = xml
+          ? await reservasService.descargarFacturaXml(reserva.id)
+          : await reservasService.descargarFacturaPdf(reserva.id);
+      final extension = xml ? "xml" : "pdf";
+      if (xml) {
+        descargarXml(
+          archivo,
+          "factura-${reserva.codigoReserva}.$extension",
+        );
+      } else {
+        descargarPdf(
+          archivo,
+          "factura-${reserva.codigoReserva}.$extension",
+        );
+      }
+    } catch (error) {
+      if (!mounted) return;
+      final detalle = error.toString().replaceFirst("Exception: ", "");
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(detalle),
+          behavior: SnackBarBehavior.floating,
+          backgroundColor: Colors.red.shade700,
+        ),
+      );
+    }
+  }
+
   @override
   void initState() {
     super.initState();
     cargar();
+    _iniciarActualizacionAutomatica();
+  }
+
+  void _iniciarActualizacionAutomatica() {
+    _temporizadorActualizacion?.cancel();
+    _temporizadorActualizacion = Timer.periodic(
+      const Duration(seconds: 10),
+      (_) => cargar(silencioso: true),
+    );
+  }
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    final ruta = ModalRoute.of(context);
+    if (ruta is PageRoute) flyGoRouteObserver.subscribe(this, ruta);
+  }
+
+  @override
+  void didPushNext() {
+    _rutaVisible = false;
+    _temporizadorActualizacion?.cancel();
+  }
+
+  @override
+  void didPopNext() {
+    _rutaVisible = true;
+    cargar(silencioso: true);
+    _iniciarActualizacionAutomatica();
+  }
+
+  @override
+  void dispose() {
+    flyGoRouteObserver.unsubscribe(this);
+    _temporizadorActualizacion?.cancel();
+    super.dispose();
   }
 
   @override
@@ -111,7 +254,8 @@ class _ReservasPageState extends State<ReservasPage> {
                           ),
                           child: Row(
                             children: [
-                              Icon(Icons.error_outline, color: Colors.red.shade700),
+                              Icon(Icons.error_outline,
+                                  color: Colors.red.shade700),
                               const SizedBox(width: 10),
                               Expanded(
                                 child: Text(
@@ -129,16 +273,21 @@ class _ReservasPageState extends State<ReservasPage> {
                               child: Column(
                                 mainAxisAlignment: MainAxisAlignment.center,
                                 children: [
-                                  Icon(Icons.confirmation_number_outlined, size: 64, color: Colors.grey.shade400),
+                                  Icon(Icons.confirmation_number_outlined,
+                                      size: 64, color: Colors.grey.shade400),
                                   const SizedBox(height: 16),
                                   Text(
                                     "No tienes ninguna reserva registrada.",
-                                    style: TextStyle(color: Colors.grey.shade600, fontSize: 16),
+                                    style: TextStyle(
+                                        color: Colors.grey.shade600,
+                                        fontSize: 16),
                                   ),
                                   const SizedBox(height: 10),
                                   Text(
                                     "Vuelve a la pantalla principal para buscar vuelos.",
-                                    style: TextStyle(color: Colors.grey.shade500, fontSize: 13),
+                                    style: TextStyle(
+                                        color: Colors.grey.shade500,
+                                        fontSize: 13),
                                   ),
                                 ],
                               ),
@@ -151,34 +300,46 @@ class _ReservasPageState extends State<ReservasPage> {
                                 return ReservaCard(
                                   reserva: r,
                                   onCancelar: () => cancelar(r.id),
-                                  onEditar: () {
-                                    final vuelo = Vuelo(
-                                      id: r.vueloId,
-                                      aerolinea: r.aerolinea,
-                                      origen: r.origen,
-                                      destino: r.destino,
-                                      fecha: r.fechaVuelo,
-                                      horaSalida: r.horaSalida,
-                                      horaLlegada: r.horaLlegada,
-                                      precio: r.cantidadAsientos > 0 ? (r.total / r.cantidadAsientos) : 0.0,
-                                      asientosDisponibles: 0,
-                                    );
+                                  onDescargar: kIsWeb && r.estado == "ACTIVA"
+                                      ? () => descargarBoletos(r)
+                                      : null,
+                                  onFacturaPdf: kIsWeb && r.estado == "ACTIVA"
+                                      ? () => descargarFactura(r, xml: false)
+                                      : null,
+                                  onFacturaXml: kIsWeb && r.estado == "ACTIVA"
+                                      ? () => descargarFactura(r, xml: true)
+                                      : null,
+                                  onEditar: r.modificada
+                                      ? null
+                                      : () {
+                                          final vuelo = Vuelo(
+                                            id: r.vueloId,
+                                            aerolinea: r.aerolinea,
+                                            origen: r.origen,
+                                            destino: r.destino,
+                                            fecha: r.fechaVuelo,
+                                            horaSalida: r.horaSalida,
+                                            horaLlegada: r.horaLlegada,
+                                            precio: r.precioActual,
+                                            asientosDisponibles: 0,
+                                          );
 
-                                    Navigator.push(
-                                      context,
-                                      MaterialPageRoute(
-                                        builder: (context) => SeleccionAsientosPage(
-                                          vuelo: vuelo,
-                                          editReservaId: r.id,
-                                          asientosIniciales: r.asientos,
-                                        ),
-                                      ),
-                                    ).then((value) {
-                                      if (value == true) {
-                                        cargar();
-                                      }
-                                    });
-                                  },
+                                          Navigator.push(
+                                            context,
+                                            MaterialPageRoute(
+                                              builder: (context) =>
+                                                  SeleccionAsientosPage(
+                                                vuelo: vuelo,
+                                                editReservaId: r.id,
+                                                asientosIniciales: r.asientos,
+                                              ),
+                                            ),
+                                          ).then((value) {
+                                            if (value == true) {
+                                              cargar();
+                                            }
+                                          });
+                                        },
                                 );
                               },
                             ),

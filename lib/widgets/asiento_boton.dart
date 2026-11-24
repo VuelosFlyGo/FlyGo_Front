@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import '../models/asiento.dart';
+import '../theme/aerotech_theme.dart';
 
 class AsientoBoton extends StatelessWidget {
   final Asiento asiento;
@@ -23,43 +24,45 @@ class AsientoBoton extends StatelessWidget {
     IconData seatIcon;
 
     if (asiento.reservado && !seleccionado) {
-      bgColor = Colors.red.shade50;
-      borderColor = Colors.red.shade200;
-      textColor = Colors.red.shade800;
-      seatIcon = Icons.event_seat;
+      bgColor = const Color(0xFFF1F3F7);
+      borderColor = const Color(0xFFCAD1DE);
+      textColor = const Color(0xFF8A93A5);
+      seatIcon = Icons.lock_outline;
     } else if (seleccionado) {
-      bgColor = Colors.green.shade600;
-      borderColor = Colors.green.shade700;
+      bgColor = AeroColors.blue;
+      borderColor = AeroColors.blue;
       textColor = Colors.white;
-      seatIcon = Icons.check_circle_outline;
+      seatIcon = Icons.check_rounded;
     } else {
-      bgColor = Colors.blue.shade50;
-      borderColor = Colors.blue.shade300;
-      textColor = Colors.blue.shade800;
-      seatIcon = Icons.event_seat_outlined;
+      bgColor = const Color(0xFFEAF1FF);
+      borderColor = AeroColors.cyan;
+      textColor = AeroColors.navy;
+      seatIcon = Icons.airline_seat_recline_normal;
     }
 
     return Material(
       color: Colors.transparent,
       child: InkWell(
-        onTap: (asiento.disponible || seleccionado || habilitado) ? onTap : null,
-        borderRadius: BorderRadius.circular(12),
+        onTap:
+            (asiento.disponible || seleccionado || habilitado) ? onTap : null,
+        borderRadius: BorderRadius.circular(10),
         child: AnimatedContainer(
-          duration: const Duration(milliseconds: 200),
-          width: 65,
-          height: 60,
+          duration: const Duration(milliseconds: 180),
+          curve: Curves.easeOutCubic,
+          width: 52,
+          height: 58,
           alignment: Alignment.center,
-          margin: const EdgeInsets.all(8),
+          margin: const EdgeInsets.all(3),
           decoration: BoxDecoration(
             color: bgColor,
-            borderRadius: BorderRadius.circular(12),
-            border: Border.all(color: borderColor, width: 1.5),
+            borderRadius: BorderRadius.circular(10),
+            border: Border.all(color: borderColor, width: 1.25),
             boxShadow: seleccionado
                 ? [
                     BoxShadow(
-                      color: Colors.green.withOpacity(0.3),
-                      blurRadius: 6,
-                      offset: const Offset(0, 2),
+                      color: AeroColors.blue.withValues(alpha: .24),
+                      blurRadius: 12,
+                      offset: const Offset(0, 5),
                     )
                   ]
                 : [],
@@ -67,7 +70,7 @@ class AsientoBoton extends StatelessWidget {
           child: Column(
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
-              Icon(seatIcon, size: 16, color: textColor),
+              Icon(seatIcon, size: 17, color: textColor),
               const SizedBox(height: 4),
               Text(
                 asiento.numeroAsiento,

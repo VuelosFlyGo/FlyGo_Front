@@ -30,6 +30,9 @@ migrate_working_dir/
 .pub-cache/
 .pub/
 /build/
+/build_web_verified/
+/build_web_verified2/
+/.impeccable/
 
 # Symbolication related
 app.*.symbols

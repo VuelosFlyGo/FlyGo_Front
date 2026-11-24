@@ -2,6 +2,7 @@ import 'dart:convert';
 import 'package:http/http.dart' as http;
 import '../config/api_config.dart';
 import '../models/asiento.dart';
+import 'session_service.dart';
 
 class AsientoService {
   Future<List<Asiento>> listarAsientos(int vueloId) async {
@@ -20,7 +21,8 @@ class AsientoService {
     }
 
     if (response.statusCode == 401) {
-      throw Exception("Sesión expirada o token inválido");
+      await SessionService.expirar();
+      throw const SesionExpiradaException();
     }
 
     throw Exception(response.body);
@@ -49,7 +51,14 @@ class AsientoService {
     }
 
     if (response.statusCode == 401) {
-      throw Exception("Sesión expirada o token inválido");
+      await SessionService.expirar();
+      throw const SesionExpiradaException();
+    }
+
+    if (response.statusCode == 409) {
+      throw const ConflictoConcurrenciaException(
+        "Otro cliente reservó uno de esos asientos al mismo tiempo. Actualizamos el mapa; revise los asientos disponibles y seleccione otro.",
+      );
     }
 
     throw Exception(response.body);

@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import '../models/vuelo.dart';
 import '../services/admin_vuelo_service.dart';
+import '../theme/aerotech_theme.dart';
+import '../widgets/aerotech_logo.dart';
 
 class CrearVueloPage extends StatefulWidget {
   final Vuelo? vuelo;
@@ -32,14 +34,21 @@ class _CrearVueloPageState extends State<CrearVueloPage> {
   @override
   void initState() {
     super.initState();
-    aerolineaCtrl = TextEditingController(text: widget.vuelo?.aerolinea ?? "AeroAndes");
+    aerolineaCtrl =
+        TextEditingController(text: widget.vuelo?.aerolinea ?? "AeroAndes");
     origenCtrl = TextEditingController(text: widget.vuelo?.origen ?? "Quito");
-    destinoCtrl = TextEditingController(text: widget.vuelo?.destino ?? "Guayaquil");
-    fechaCtrl = TextEditingController(text: widget.vuelo?.fecha ?? "2026-06-20");
-    horaSalidaCtrl = TextEditingController(text: widget.vuelo?.horaSalida.substring(0, 5) ?? "08:00");
-    horaLlegadaCtrl = TextEditingController(text: widget.vuelo?.horaLlegada.substring(0, 5) ?? "09:00");
-    precioCtrl = TextEditingController(text: widget.vuelo?.precio.toString() ?? "85.00");
-    cantidadAsientosCtrl = TextEditingController(text: widget.vuelo?.asientosDisponibles.toString() ?? "12");
+    destinoCtrl =
+        TextEditingController(text: widget.vuelo?.destino ?? "Guayaquil");
+    fechaCtrl =
+        TextEditingController(text: widget.vuelo?.fecha ?? "2027-06-20");
+    horaSalidaCtrl = TextEditingController(
+        text: widget.vuelo?.horaSalida.substring(0, 5) ?? "08:00");
+    horaLlegadaCtrl = TextEditingController(
+        text: widget.vuelo?.horaLlegada.substring(0, 5) ?? "09:00");
+    precioCtrl =
+        TextEditingController(text: widget.vuelo?.precio.toString() ?? "85.00");
+    cantidadAsientosCtrl = TextEditingController(
+        text: widget.vuelo?.totalAsientos.toString() ?? "12");
   }
 
   Future<void> guardarVuelo() async {
@@ -49,7 +58,30 @@ class _CrearVueloPageState extends State<CrearVueloPage> {
       exito = false;
     });
 
-    // Validations
+    if ([
+      aerolineaCtrl,
+      origenCtrl,
+      destinoCtrl,
+      fechaCtrl,
+      horaSalidaCtrl,
+      horaLlegadaCtrl
+    ].any((controller) => controller.text.trim().isEmpty)) {
+      setState(() {
+        guardando = false;
+        mensaje = "Todos los datos del itinerario son obligatorios.";
+      });
+      return;
+    }
+
+    if (origenCtrl.text.trim().toLowerCase() ==
+        destinoCtrl.text.trim().toLowerCase()) {
+      setState(() {
+        guardando = false;
+        mensaje = "El origen y el destino deben ser diferentes.";
+      });
+      return;
+    }
+
     final precio = double.tryParse(precioCtrl.text.trim());
     if (precio == null || precio <= 0) {
       setState(() {
@@ -76,11 +108,13 @@ class _CrearVueloPageState extends State<CrearVueloPage> {
         if (timeParts.length == 2) {
           final hour = int.tryParse(timeParts[0]) ?? 0;
           final minute = int.tryParse(timeParts[1]) ?? 0;
-          final departureDateTime = DateTime(date.year, date.month, date.day, hour, minute);
+          final departureDateTime =
+              DateTime(date.year, date.month, date.day, hour, minute);
           if (departureDateTime.isBefore(now)) {
             setState(() {
               guardando = false;
-              mensaje = "La hora de salida no puede ser anterior a la hora actual.";
+              mensaje =
+                  "La hora de salida no puede ser anterior a la hora actual.";
             });
             return;
           }
@@ -95,14 +129,15 @@ class _CrearVueloPageState extends State<CrearVueloPage> {
       final minuteSalida = int.tryParse(timePartsSalida[1]) ?? 0;
       final hourLlegada = int.tryParse(timePartsLlegada[0]) ?? 0;
       final minuteLlegada = int.tryParse(timePartsLlegada[1]) ?? 0;
-      
+
       final minutosSalida = hourSalida * 60 + minuteSalida;
       final minutosLlegada = hourLlegada * 60 + minuteLlegada;
-      
+
       if (minutosLlegada <= minutosSalida) {
         setState(() {
           guardando = false;
-          mensaje = "La hora de llegada debe ser posterior a la hora de salida.";
+          mensaje =
+              "La hora de llegada debe ser posterior a la hora de salida.";
         });
         return;
       }
@@ -119,11 +154,15 @@ class _CrearVueloPageState extends State<CrearVueloPage> {
           horaSalida: horaSalidaCtrl.text.trim(),
           horaLlegada: horaLlegadaCtrl.text.trim(),
           precio: double.parse(precioCtrl.text.trim()),
+          cantidadAsientos: int.parse(cantidadAsientosCtrl.text.trim()),
         );
 
-        setState(() {
-          exito = true;
-          mensaje = "Vuelo actualizado correctamente.";
+        if (!mounted) return;
+        Navigator.pop(context, {
+          "accion": "editado",
+          "origen": origenCtrl.text.trim(),
+          "destino": destinoCtrl.text.trim(),
+          "fecha": fechaCtrl.text.trim(),
         });
       } else {
         final respuesta = await adminVueloService.crearVuelo(
@@ -137,14 +176,14 @@ class _CrearVueloPageState extends State<CrearVueloPage> {
           cantidadAsientos: int.parse(cantidadAsientosCtrl.text.trim()),
         );
 
-        final vueloJson = respuesta["vuelo"];
-
-        setState(() {
-          exito = true;
-          mensaje =
-              "Vuelo creado correctamente\n"
-              "ID: ${vueloJson["id"]}\n"
-              "Asientos generados: ${vueloJson["asientos_generados"].join(", ")}";
+        final vueloJson = respuesta["vuelo"] as Map<String, dynamic>;
+        if (!mounted) return;
+        Navigator.pop(context, {
+          "accion": "creado",
+          "origen": vueloJson["origen"],
+          "destino": vueloJson["destino"],
+          "fecha": vueloJson["fecha"],
+          "id": vueloJson["id"],
         });
       }
     } catch (e) {
@@ -153,27 +192,29 @@ class _CrearVueloPageState extends State<CrearVueloPage> {
         mensaje = "Error: $e";
       });
     } finally {
-      setState(() {
-        guardando = false;
-      });
+      if (mounted) setState(() => guardando = false);
     }
   }
 
   Future<void> _seleccionarFecha(BuildContext context) async {
+    final hoy = DateUtils.dateOnly(DateTime.now());
+    final actual = DateTime.tryParse(fechaCtrl.text);
     final DateTime? picked = await showDatePicker(
       context: context,
-      initialDate: DateTime.tryParse(fechaCtrl.text) ?? DateTime.now(),
-      firstDate: DateUtils.dateOnly(DateTime.now()),
+      initialDate: actual != null && !actual.isBefore(hoy) ? actual : hoy,
+      firstDate: hoy,
       lastDate: DateTime.now().add(const Duration(days: 365 * 2)),
     );
     if (picked != null) {
       setState(() {
-        fechaCtrl.text = "${picked.year}-${picked.month.toString().padLeft(2, '0')}-${picked.day.toString().padLeft(2, '0')}";
+        fechaCtrl.text =
+            "${picked.year}-${picked.month.toString().padLeft(2, '0')}-${picked.day.toString().padLeft(2, '0')}";
       });
     }
   }
 
-  Future<void> _seleccionarHora(BuildContext context, TextEditingController controller) async {
+  Future<void> _seleccionarHora(
+      BuildContext context, TextEditingController controller) async {
     final parts = controller.text.split(":");
     final initialHour = parts.isNotEmpty ? (int.tryParse(parts[0]) ?? 8) : 8;
     final initialMinute = parts.length > 1 ? (int.tryParse(parts[1]) ?? 0) : 0;
@@ -187,12 +228,14 @@ class _CrearVueloPageState extends State<CrearVueloPage> {
       if (date != null) {
         final now = DateTime.now();
         if (DateUtils.isSameDay(date, now)) {
-          final selectedTime = DateTime(date.year, date.month, date.day, picked.hour, picked.minute);
+          final selectedTime = DateTime(
+              date.year, date.month, date.day, picked.hour, picked.minute);
           if (selectedTime.isBefore(now)) {
             if (!context.mounted) return;
             ScaffoldMessenger.of(context).showSnackBar(
               SnackBar(
-                content: const Text("La hora no puede ser anterior a la hora actual."),
+                content: const Text(
+                    "La hora no puede ser anterior a la hora actual."),
                 backgroundColor: Colors.red.shade700,
                 behavior: SnackBarBehavior.floating,
               ),
@@ -213,7 +256,8 @@ class _CrearVueloPageState extends State<CrearVueloPage> {
             if (!context.mounted) return;
             ScaffoldMessenger.of(context).showSnackBar(
               SnackBar(
-                content: const Text("La hora de llegada debe ser posterior a la de salida."),
+                content: const Text(
+                    "La hora de llegada debe ser posterior a la de salida."),
                 backgroundColor: Colors.red.shade700,
                 behavior: SnackBarBehavior.floating,
               ),
@@ -224,7 +268,8 @@ class _CrearVueloPageState extends State<CrearVueloPage> {
       }
 
       setState(() {
-        controller.text = "${picked.hour.toString().padLeft(2, '0')}:${picked.minute.toString().padLeft(2, '0')}";
+        controller.text =
+            "${picked.hour.toString().padLeft(2, '0')}:${picked.minute.toString().padLeft(2, '0')}";
       });
     }
   }
@@ -257,7 +302,7 @@ class _CrearVueloPageState extends State<CrearVueloPage> {
         inputFormatters: inputFormatters,
         decoration: InputDecoration(
           labelText: label,
-          prefixIcon: Icon(icon, color: Colors.blue.shade700),
+          prefixIcon: Icon(icon, color: AeroColors.navy),
           filled: true,
           fillColor: Colors.white,
           border: OutlineInputBorder(
@@ -270,7 +315,7 @@ class _CrearVueloPageState extends State<CrearVueloPage> {
           ),
           focusedBorder: OutlineInputBorder(
             borderRadius: BorderRadius.circular(12),
-            borderSide: BorderSide(color: Colors.blue.shade700, width: 2),
+            borderSide: const BorderSide(color: AeroColors.cyan, width: 2),
           ),
         ),
       ),
@@ -291,7 +336,7 @@ class _CrearVueloPageState extends State<CrearVueloPage> {
         onTap: onTap,
         decoration: InputDecoration(
           labelText: label,
-          prefixIcon: Icon(icon, color: Colors.blue.shade700),
+          prefixIcon: Icon(icon, color: AeroColors.navy),
           suffixIcon: const Icon(Icons.arrow_drop_down),
           filled: true,
           fillColor: Colors.white,
@@ -305,7 +350,7 @@ class _CrearVueloPageState extends State<CrearVueloPage> {
           ),
           focusedBorder: OutlineInputBorder(
             borderRadius: BorderRadius.circular(12),
-            borderSide: BorderSide(color: Colors.blue.shade700, width: 2),
+            borderSide: const BorderSide(color: AeroColors.cyan, width: 2),
           ),
         ),
       ),
@@ -315,30 +360,33 @@ class _CrearVueloPageState extends State<CrearVueloPage> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: Colors.grey.shade50,
+      backgroundColor: AeroColors.ice,
       appBar: AppBar(
-        title: Text(esEdicion ? "Editar Vuelo" : "Registrar Vuelo"),
+        title: Row(children: [
+          const AeroTechLogo(size: 36),
+          const SizedBox(width: 12),
+          Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+            Text(esEdicion ? "EDITAR VUELO" : "NUEVO VUELO",
+                style: const TextStyle(
+                    fontSize: 15,
+                    fontWeight: FontWeight.w900,
+                    letterSpacing: 1.1)),
+            const Text("FLYGO · CONTROL DE OPERACIONES",
+                style: TextStyle(
+                    fontSize: 9, color: AeroColors.cyan, letterSpacing: 1)),
+          ]),
+        ]),
         elevation: 0,
-        backgroundColor: Colors.transparent,
-        flexibleSpace: Container(
-          decoration: BoxDecoration(
-            gradient: LinearGradient(
-              colors: [Colors.blue.shade800, Colors.blue.shade500],
-              begin: Alignment.topLeft,
-              end: Alignment.bottomRight,
-            ),
-          ),
-        ),
+        backgroundColor: AeroColors.navy,
         foregroundColor: Colors.white,
       ),
       body: SingleChildScrollView(
         child: Center(
           child: Container(
-            constraints: const BoxConstraints(maxWidth: 550),
+            constraints: const BoxConstraints(maxWidth: 780),
             padding: const EdgeInsets.all(24),
             child: Card(
-              elevation: 8,
-              shadowColor: Colors.black12,
+              elevation: 0,
               shape: RoundedRectangleBorder(
                 borderRadius: BorderRadius.circular(20),
               ),
@@ -352,15 +400,17 @@ class _CrearVueloPageState extends State<CrearVueloPage> {
                         Icon(
                           esEdicion ? Icons.edit_road : Icons.flight_takeoff,
                           size: 32,
-                          color: Colors.blue.shade800,
+                          color: AeroColors.cyan,
                         ),
                         const SizedBox(width: 12),
                         Text(
-                          esEdicion ? "Modificar Datos del Vuelo" : "Datos del Vuelo",
+                          esEdicion
+                              ? "Modificar Datos del Vuelo"
+                              : "Datos del Vuelo",
                           style: TextStyle(
                             fontSize: 22,
                             fontWeight: FontWeight.bold,
-                            color: Colors.blue.shade900,
+                            color: AeroColors.navy,
                           ),
                         ),
                       ],
@@ -368,7 +418,7 @@ class _CrearVueloPageState extends State<CrearVueloPage> {
                     const SizedBox(height: 10),
                     Text(
                       esEdicion
-                          ? "Actualice los detalles del vuelo. Los asientos y las reservas existentes no se alterarán."
+                          ? "Actualice el itinerario y la capacidad. La capacidad nunca podrá quedar por debajo de los asientos ya reservados."
                           : "Ingrese la información para el nuevo itinerario. El sistema creará los asientos automáticamente.",
                       style: TextStyle(
                         fontSize: 14,
@@ -377,12 +427,13 @@ class _CrearVueloPageState extends State<CrearVueloPage> {
                       ),
                     ),
                     const Divider(height: 32, thickness: 1.2),
-                     campo(
+                    campo(
                       controller: aerolineaCtrl,
                       label: "Aerolínea",
                       icon: Icons.flight,
                       inputFormatters: [
-                        FilteringTextInputFormatter.allow(RegExp(r'[a-zA-ZáéíóúÁÉÍÓÚñÑ0-9\s]')),
+                        FilteringTextInputFormatter.allow(
+                            RegExp(r'[a-zA-ZáéíóúÁÉÍÓÚñÑ0-9\s]')),
                         LengthLimitingTextInputFormatter(40),
                       ],
                     ),
@@ -394,7 +445,8 @@ class _CrearVueloPageState extends State<CrearVueloPage> {
                             label: "Origen",
                             icon: Icons.location_on,
                             inputFormatters: [
-                              FilteringTextInputFormatter.allow(RegExp(r'[a-zA-ZáéíóúÁÉÍÓÚñÑ\s]')),
+                              FilteringTextInputFormatter.allow(
+                                  RegExp(r'[a-zA-ZáéíóúÁÉÍÓÚñÑ\s]')),
                               LengthLimitingTextInputFormatter(30),
                             ],
                           ),
@@ -406,7 +458,8 @@ class _CrearVueloPageState extends State<CrearVueloPage> {
                             label: "Destino",
                             icon: Icons.place,
                             inputFormatters: [
-                              FilteringTextInputFormatter.allow(RegExp(r'[a-zA-ZáéíóúÁÉÍÓÚñÑ\s]')),
+                              FilteringTextInputFormatter.allow(
+                                  RegExp(r'[a-zA-ZáéíóúÁÉÍÓÚñÑ\s]')),
                               LengthLimitingTextInputFormatter(30),
                             ],
                           ),
@@ -426,7 +479,8 @@ class _CrearVueloPageState extends State<CrearVueloPage> {
                             controller: horaSalidaCtrl,
                             label: "Hora Salida",
                             icon: Icons.schedule,
-                            onTap: () => _seleccionarHora(context, horaSalidaCtrl),
+                            onTap: () =>
+                                _seleccionarHora(context, horaSalidaCtrl),
                           ),
                         ),
                         const SizedBox(width: 16),
@@ -435,7 +489,8 @@ class _CrearVueloPageState extends State<CrearVueloPage> {
                             controller: horaLlegadaCtrl,
                             label: "Hora Llegada",
                             icon: Icons.access_time,
-                            onTap: () => _seleccionarHora(context, horaLlegadaCtrl),
+                            onTap: () =>
+                                _seleccionarHora(context, horaLlegadaCtrl),
                           ),
                         ),
                       ],
@@ -447,27 +502,27 @@ class _CrearVueloPageState extends State<CrearVueloPage> {
                             controller: precioCtrl,
                             label: "Precio (USD)",
                             icon: Icons.attach_money,
-                            keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                            keyboardType: const TextInputType.numberWithOptions(
+                                decimal: true),
                             inputFormatters: [
-                              FilteringTextInputFormatter.allow(RegExp(r'^\d*\.?\d*')),
+                              FilteringTextInputFormatter.allow(
+                                  RegExp(r'^\d*\.?\d*')),
                             ],
                           ),
                         ),
-                        if (!esEdicion) ...[
-                          const SizedBox(width: 16),
-                          Expanded(
-                            child: campo(
-                              controller: cantidadAsientosCtrl,
-                              label: "Capacidad Asientos",
-                              icon: Icons.event_seat,
-                              keyboardType: TextInputType.number,
-                              inputFormatters: [
-                                FilteringTextInputFormatter.digitsOnly,
-                                LengthLimitingTextInputFormatter(3),
-                              ],
-                            ),
+                        const SizedBox(width: 16),
+                        Expanded(
+                          child: campo(
+                            controller: cantidadAsientosCtrl,
+                            label: "Capacidad total",
+                            icon: Icons.event_seat,
+                            keyboardType: TextInputType.number,
+                            inputFormatters: [
+                              FilteringTextInputFormatter.digitsOnly,
+                              LengthLimitingTextInputFormatter(3),
+                            ],
                           ),
-                        ],
+                        ),
                       ],
                     ),
                     const SizedBox(height: 16),
@@ -476,8 +531,8 @@ class _CrearVueloPageState extends State<CrearVueloPage> {
                       height: 52,
                       child: ElevatedButton.icon(
                         style: ElevatedButton.styleFrom(
-                          backgroundColor: Colors.blue.shade800,
-                          foregroundColor: Colors.white,
+                          backgroundColor: AeroColors.cyan,
+                          foregroundColor: AeroColors.navy,
                           elevation: 2,
                           shape: RoundedRectangleBorder(
                             borderRadius: BorderRadius.circular(12),
@@ -497,7 +552,9 @@ class _CrearVueloPageState extends State<CrearVueloPage> {
                         label: Text(
                           guardando
                               ? "Guardando..."
-                              : (esEdicion ? "Guardar Cambios" : "Registrar Vuelo"),
+                              : (esEdicion
+                                  ? "Guardar Cambios"
+                                  : "Registrar Vuelo"),
                           style: const TextStyle(
                             fontSize: 16,
                             fontWeight: FontWeight.bold,
@@ -512,10 +569,13 @@ class _CrearVueloPageState extends State<CrearVueloPage> {
                         width: double.infinity,
                         padding: const EdgeInsets.all(16),
                         decoration: BoxDecoration(
-                          color: exito ? Colors.green.shade50 : Colors.red.shade50,
+                          color:
+                              exito ? Colors.green.shade50 : Colors.red.shade50,
                           borderRadius: BorderRadius.circular(12),
                           border: Border.all(
-                            color: exito ? Colors.green.shade300 : Colors.red.shade300,
+                            color: exito
+                                ? Colors.green.shade300
+                                : Colors.red.shade300,
                             width: 1.2,
                           ),
                         ),
@@ -524,7 +584,9 @@ class _CrearVueloPageState extends State<CrearVueloPage> {
                           children: [
                             Icon(
                               exito ? Icons.check_circle : Icons.error,
-                              color: exito ? Colors.green.shade700 : Colors.red.shade700,
+                              color: exito
+                                  ? Colors.green.shade700
+                                  : Colors.red.shade700,
                             ),
                             const SizedBox(width: 12),
                             Expanded(
@@ -532,7 +594,9 @@ class _CrearVueloPageState extends State<CrearVueloPage> {
                                 mensaje,
                                 style: TextStyle(
                                   fontSize: 14,
-                                  color: exito ? Colors.green.shade900 : Colors.red.shade900,
+                                  color: exito
+                                      ? Colors.green.shade900
+                                      : Colors.red.shade900,
                                   height: 1.4,
                                 ),
                               ),
