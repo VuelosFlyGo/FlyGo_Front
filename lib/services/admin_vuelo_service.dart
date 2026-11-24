@@ -1,9 +1,35 @@
 import 'dart:convert';
 import 'package:http/http.dart' as http;
 import '../config/api_config.dart';
+import '../models/admin_dashboard.dart';
 import 'session_service.dart';
+import 'servidor_no_disponible_exception.dart';
 
 class AdminVueloService {
+  Future<AdminDashboardData> obtenerDashboard() async {
+    final url = Uri.parse("${ApiConfig.baseUrl}/api/admin/dashboard");
+    late http.Response response;
+    try {
+      response = await http.get(
+        url,
+        headers: {"Authorization": "Bearer ${ApiConfig.token}"},
+      );
+    } on http.ClientException {
+      throw const ServidorNoDisponibleException();
+    }
+
+    if (response.statusCode == 200) {
+      return AdminDashboardData.fromJson(jsonDecode(response.body));
+    }
+    if (response.statusCode == 401) {
+      await SessionService.expirar();
+      throw const SesionExpiradaException();
+    }
+    throw Exception(
+      _mensajeError(response.body, "No se pudo cargar el dashboard."),
+    );
+  }
+
   Future<Map<String, dynamic>> crearVuelo({
     required String aerolinea,
     required String origen,

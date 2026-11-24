@@ -407,7 +407,7 @@ class _CrearVueloPageState extends State<CrearVueloPage> {
                           esEdicion
                               ? "Modificar Datos del Vuelo"
                               : "Datos del Vuelo",
-                          style: TextStyle(
+                          style: const TextStyle(
                             fontSize: 22,
                             fontWeight: FontWeight.bold,
                             color: AeroColors.navy,

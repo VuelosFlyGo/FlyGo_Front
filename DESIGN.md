@@ -103,6 +103,7 @@ The system feels precise, assured, and energetic. Dense information is grouped i
 - Route-driven storytelling, anchored by the featured UIO→GYE journey.
 - Layered FlyGo welcome with a sky plate, transparent full-aircraft cutout, and soft white edge blend into authentication.
 - Top-down narrow-body cabin maps that turn A–D seat data into an immediately legible 2–2 aircraft interior.
+- Admin-only operations intelligence that pairs a white/ice overview with navy commercial analysis and durable coral audit evidence.
 
 ## Colors
 
@@ -164,6 +165,8 @@ Desktop surfaces sit in centered working areas up to 1180px wide; focused forms 
 Route information reads directionally from origin to destination. Keep airport codes, time, status, and price aligned into scannable clusters, with the primary action at the terminal edge of the row. Desktop pairs may collapse or wrap on narrow screens, but their semantic order must remain intact.
 
 Seat selection centers a narrow-body cabin at up to 430px wide inside a broader 620px content area. The 2–2 seat grid compresses from 58px to 48px seat columns and from 58px to 44px aisle width on compact screens. Normal phone widths keep the cabin centered without horizontal scrolling; only viewports narrower than 300px may use a minimal horizontal fallback. The checkout summary must remain flexible: seat labels can wrap or ellipsize, totals stay legible, and the confirmation action must not be pushed off-screen. Reservation-card actions use a wrapping row with 8px horizontal and 6px vertical gaps so PDF, cancellation, and seat-change actions remain reachable without shrinking labels or overflowing.
+
+Administrative intelligence uses a full-width ice work surface with 20px content padding. The metric band flows from four columns at 720px and above, to two columns between 480px and 719px, then one column below 480px. The overview pair uses a 5:3 split between upcoming departures and commercial activity on wide screens, stacking vertically below 850px. Audit records keep route identity and evidence on one row when space permits, then stack their metadata below 680px without hiding timestamps or related-reservation counts.
 
 ## Elevation & Depth
 
@@ -317,6 +320,24 @@ Administrators edit total capacity, not remaining availability. Populate the fie
 
 **The Total, Not Available Rule.** Capacity fields and summaries must distinguish aircraft total from remaining availability; never preload an edit field with the available-seat count.
 
+### Admin Operations Dashboard
+
+The admin-only dashboard extends the Operate surface with two explicit tabs: “Resumen” for current network health and “Auditoría” for retained deactivation evidence. Use a white app bar over the ice canvas, navy identity text, and action blue for the active tab indicator, icon, and label. Inactive navigation stays muted. Manual refresh and pull-to-refresh are equivalent recovery actions; initial loading may use a centered progress indicator, while unavailable-server and generic-error states preserve a constrained retry surface.
+
+The summary opens with a responsive metric band for active flights, completed flights, free seats, and active clients. Each metric uses the same white ruled container, a compact tinted icon tile, a strong 22px value, and a muted 12px label. Semantic colors clarify the reading: emerald for live/active capacity, action blue for completed operational counts, warm orange for available-seat inventory, and cyan for clients. These colors reinforce meaning but never replace labels.
+
+“Próximas salidas” is a white ruled list ordered for scanning route, airline/date, departure time, and remaining seats. Route content expands first; time and capacity stay right aligned. Remaining seats use emerald to signal live capacity. An empty schedule stays inside the same container with a concise text state rather than inventing placeholder flights.
+
+“Actividad de reservas” is the signature navy operations panel. It groups active reservations, confirmed passengers, confirmed revenue, and deactivated flights as divided label/value rows. White values carry emphasis; supporting labels use translucent white, and cyan appears only as the section marker. This dark panel is analytical contrast, not a second navigation region.
+
+The audit tab treats soft deletion as evidence. Lead with “Vuelos desactivados,” explanatory copy, and a coral record-count badge. Each white audit record preserves route, airline, flight identifier, scheduled departure, deactivation timestamp, related-reservation count, and an inactive state. Use coral for the inactive/evidence signal and action blue for neutral metadata icons. On compact layouts, present each metadata field as its own labeled row; do not truncate the record into a generic status card. If the deactivation time is unavailable, label it “Registro anterior” rather than fabricating precision.
+
+**The Overview Before Evidence Rule.** “Resumen” presents live operational health first; “Auditoría” preserves inactive evidence separately without mixing historical records into active metrics.
+
+**The Color Carries Status, Labels Carry Meaning Rule.** Emerald denotes live capacity and coral denotes inactive evidence, but every metric and record remains understandable from text alone.
+
+**The Audit Is a Record Rule.** Deactivated flights retain route, timing, identity, and relationship context; never reduce audit evidence to a count or delete affordance.
+
 ## Do's and Don'ts
 
 ### Do:
@@ -341,6 +362,10 @@ Administrators edit total capacity, not remaining availability. Populate the fie
 - **Do** edit total capacity and explain the reserved-seat minimum before submission.
 - **Do** distinguish a same-reservation cross-tab update with its dedicated dialog and return path to “Mis reservas.”
 - **Do** unregister obsolete service workers before starting the local development web build.
+- **Do** keep admin “Resumen” and “Auditoría” as distinct blue-indicated tabs on the white operations bar.
+- **Do** let the metric band resolve to four, two, then one column at the established responsive thresholds.
+- **Do** pair emerald live capacity with coral inactive evidence while retaining explicit text labels.
+- **Do** preserve route, timestamps, and related reservations in every audit record.
 
 ### Don't:
 
@@ -365,3 +390,7 @@ Administrators edit total capacity, not remaining availability. Populate the fie
 - **Don't** confuse available seats with editable total capacity or permit capacity below reserved seats.
 - **Don't** treat an already-confirmed change from another tab as a retryable seat-availability conflict.
 - **Don't** allow a stale development service worker to boot an older build that clears or rewrites the current session.
+- **Don't** expose the admin dashboard or its audit evidence to client-role navigation.
+- **Don't** merge inactive audit records into upcoming departures or live operational totals.
+- **Don't** flatten the navy commercial-activity panel into an undifferentiated grid of white cards.
+- **Don't** hide audit metadata on compact screens; stack it into labeled rows.

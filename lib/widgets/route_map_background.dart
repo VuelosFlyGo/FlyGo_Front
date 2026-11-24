@@ -70,8 +70,8 @@ class _RoutePainter extends CustomPainter {
 
     final path = Path()
       ..moveTo(size.width * .08, size.height * .72)
-      ..cubicTo(size.width * .3, size.height * .25,
-          size.width * .62, size.height * .82, size.width * .92, size.height * .24);
+      ..cubicTo(size.width * .3, size.height * .25, size.width * .62,
+          size.height * .82, size.width * .92, size.height * .24);
     canvas.drawPath(
       path,
       Paint()

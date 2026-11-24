@@ -17,6 +17,7 @@ import 'login_page.dart';
 import 'reservas_page.dart';
 import 'seleccion_asientos_page.dart';
 import 'crear_vuelo_page.dart';
+import 'admin_dashboard_page.dart';
 
 class VuelosPage extends StatefulWidget {
   const VuelosPage({super.key});
@@ -433,7 +434,7 @@ class _VuelosPageState extends State<VuelosPage> with RouteAware {
       appBar: AppBar(
         title: Row(
           children: [
-            const AeroTechLogo(size: 36),
+            const AeroTechLogo(size: 36, light: false),
             const SizedBox(width: 12),
             Expanded(
                 child: Column(
@@ -460,6 +461,17 @@ class _VuelosPageState extends State<VuelosPage> with RouteAware {
         backgroundColor: Colors.white,
         foregroundColor: AeroColors.navy,
         actions: [
+          if (esAdmin)
+            IconButton(
+              onPressed: () => Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder: (_) => const AdminDashboardPage(),
+                ),
+              ),
+              icon: const Icon(Icons.space_dashboard_outlined),
+              tooltip: 'Dashboard y auditoría',
+            ),
           if (!esAdmin)
             IconButton(
               onPressed: abrirMisReservas,

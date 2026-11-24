@@ -32,13 +32,20 @@ class AeroTechLogo extends StatelessWidget {
         mark,
         const SizedBox(width: 12),
         Text.rich(
-          TextSpan(
-            children: const [
-              TextSpan(text: 'FLY', style: TextStyle(fontWeight: FontWeight.w900)),
-              TextSpan(text: 'GO', style: TextStyle(color: AeroColors.cyan, fontWeight: FontWeight.w900)),
+          const TextSpan(
+            children: [
+              TextSpan(
+                  text: 'FLY', style: TextStyle(fontWeight: FontWeight.w900)),
+              TextSpan(
+                  text: 'GO',
+                  style: TextStyle(
+                      color: AeroColors.cyan, fontWeight: FontWeight.w900)),
             ],
           ),
-          style: TextStyle(color: light ? Colors.white : AeroColors.navy, fontSize: size * .42, letterSpacing: 1.6),
+          style: TextStyle(
+              color: light ? Colors.white : AeroColors.navy,
+              fontSize: size * .42,
+              letterSpacing: 1.6),
         ),
       ],
     );

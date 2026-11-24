@@ -15,8 +15,9 @@ class VuelosService {
     final params = <String, String>{};
     if (origen != null && origen.isNotEmpty) params["origen"] = origen;
     if (destino != null && destino.isNotEmpty) params["destino"] = destino;
-    if (fechaInicio != null && fechaInicio.isNotEmpty)
+    if (fechaInicio != null && fechaInicio.isNotEmpty) {
       params["fecha_inicio"] = fechaInicio;
+    }
     if (fechaFin != null && fechaFin.isNotEmpty) params["fecha_fin"] = fechaFin;
 
     final uri = Uri.parse("${ApiConfig.baseUrl}/api/vuelos")
