@@ -15,6 +15,17 @@ class Reserva {
   final String horaLlegada;
   final List<String> asientos;
   final bool modificada;
+  final bool? cancelacionPermitida;
+
+  bool get puedeCancelar => permiteCancelarEn(DateTime.now());
+
+  bool permiteCancelarEn(DateTime ahora) {
+    final salida = DateTime.tryParse('${fechaVuelo}T$horaSalida-05:00');
+    return estado == 'ACTIVA' &&
+        cancelacionPermitida != false &&
+        salida != null &&
+        salida.difference(ahora.toUtc()) >= const Duration(hours: 24);
+  }
 
   Reserva({
     required this.id,
@@ -33,6 +44,7 @@ class Reserva {
     required this.horaLlegada,
     required this.asientos,
     required this.modificada,
+    this.cancelacionPermitida,
   });
 
   factory Reserva.fromJson(Map<String, dynamic> json) {
@@ -58,6 +70,7 @@ class Reserva {
       asientos:
           json["asientos"] == null ? [] : List<String>.from(json["asientos"]),
       modificada: json["modificada"] == true,
+      cancelacionPermitida: json["puede_cancelar"] as bool?,
     );
   }
 }

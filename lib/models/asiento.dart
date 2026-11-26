@@ -4,6 +4,8 @@ class Asiento {
   final String numeroAsiento;
   final String estado;
   final int? reservaId;
+  final String clase;
+  final double? precio;
 
   Asiento({
     required this.id,
@@ -11,6 +13,8 @@ class Asiento {
     required this.numeroAsiento,
     required this.estado,
     this.reservaId,
+    this.clase = 'TURISTA',
+    this.precio,
   });
 
   factory Asiento.fromJson(Map<String, dynamic> json) {
@@ -20,9 +24,12 @@ class Asiento {
       numeroAsiento: json["numero_asiento"],
       estado: json["estado"],
       reservaId: json["reserva_id"],
+      clase: json['clase'] ?? 'TURISTA',
+      precio: (json['precio'] as num?)?.toDouble(),
     );
   }
 
   bool get disponible => estado == "DISPONIBLE";
   bool get reservado => estado == "RESERVADO";
+  bool get ejecutivo => clase == 'EJECUTIVA';
 }

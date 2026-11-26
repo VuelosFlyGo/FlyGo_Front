@@ -13,11 +13,20 @@ import '../theme/aerotech_theme.dart';
 import '../widgets/aerotech_logo.dart';
 import '../widgets/servidor_no_disponible_panel.dart';
 import '../utils/navigation_observer.dart';
-import 'login_page.dart';
 import 'reservas_page.dart';
 import 'seleccion_asientos_page.dart';
 import 'crear_vuelo_page.dart';
 import 'admin_dashboard_page.dart';
+
+enum OrdenVuelos {
+  fecha('Fecha'),
+  precio('Precio'),
+  duracion('Duración'),
+  disponibilidad('Disponibilidad');
+
+  final String etiqueta;
+  const OrdenVuelos(this.etiqueta);
+}
 
 class VuelosPage extends StatefulWidget {
   const VuelosPage({super.key});
@@ -36,6 +45,7 @@ class _VuelosPageState extends State<VuelosPage> with RouteAware {
 
   List<Vuelo> vuelos = [];
   List<Vuelo> catalogo = [];
+  OrdenVuelos orden = OrdenVuelos.fecha;
   bool cargando = false;
   Completer<void>? _actualizacionActiva;
   Timer? _temporizadorActualizacion;
@@ -45,6 +55,29 @@ class _VuelosPageState extends State<VuelosPage> with RouteAware {
 
   bool get esAdmin => ApiConfig.rol == "admin";
 
+  DateTime get _hoyEcuador {
+    final ahora = DateTime.now().toUtc().subtract(const Duration(hours: 5));
+    return DateTime(ahora.year, ahora.month, ahora.day);
+  }
+
+  DateTime _limiteBusqueda(DateTime hoy) =>
+      DateTime(hoy.year, hoy.month, hoy.day + 730);
+
+  DateTime _inicioBusqueda(DateTime hoy) {
+    if (!esAdmin) return hoy;
+    // El administrador conserva acceso a las fechas del catálogo histórico.
+    return catalogo.fold(hoy, (minimo, vuelo) {
+      final fecha = DateTime.tryParse(vuelo.fecha);
+      return fecha != null && fecha.isBefore(minimo) ? fecha : minimo;
+    });
+  }
+
+  DateTime _acotarFecha(DateTime fecha, DateTime inicio, DateTime fin) =>
+      fecha.isBefore(inicio) ? inicio : (fecha.isAfter(fin) ? fin : fecha);
+
+  String _fechaIso(DateTime fecha) =>
+      '${fecha.year.toString().padLeft(4, '0')}-${fecha.month.toString().padLeft(2, '0')}-${fecha.day.toString().padLeft(2, '0')}';
+
   String get nombreSesion {
     final usuario = ApiConfig.usuario.trim();
     if (usuario.isEmpty) return 'Viajero';
@@ -52,8 +85,26 @@ class _VuelosPageState extends State<VuelosPage> with RouteAware {
   }
 
   String _firmaVuelos(List<Vuelo> lista) => lista
-      .map((v) => '${v.id}:${v.precio}:${v.asientosDisponibles}')
+      .map((v) =>
+          '${v.id}:${v.precio}:${v.precioEjecutiva}:${v.turistaDisponibles}:${v.ejecutivaDisponibles}:${v.asientosDisponibles}:${v.reservasActivas}')
       .join('|');
+
+  List<Vuelo> get vuelosOrdenados {
+    final resultado = List<Vuelo>.of(vuelos);
+    int porFecha(Vuelo a, Vuelo b) =>
+        '${a.fecha}T${a.horaSalida}'.compareTo('${b.fecha}T${b.horaSalida}');
+    resultado.sort((a, b) {
+      final comparacion = switch (orden) {
+        OrdenVuelos.fecha => porFecha(a, b),
+        OrdenVuelos.precio => a.precioDesde.compareTo(b.precioDesde),
+        OrdenVuelos.duracion => a.duracion.compareTo(b.duracion),
+        OrdenVuelos.disponibilidad =>
+          b.asientosDisponibles.compareTo(a.asientosDisponibles),
+      };
+      return comparacion != 0 ? comparacion : porFecha(a, b);
+    });
+    return resultado;
+  }
 
   Future<void> buscar({bool silencioso = false}) async {
     if (_actualizacionActiva != null) {
@@ -72,6 +123,21 @@ class _VuelosPageState extends State<VuelosPage> with RouteAware {
     }
 
     try {
+      // Si cambió el día durante una sesión activa, no se conservan filtros
+      // de fechas vencidas para el catálogo de clientes.
+      if (!esAdmin) {
+        final hoy = _hoyEcuador;
+        final inicio = DateTime.tryParse(fechaInicioCtrl.text);
+        final fin = DateTime.tryParse(fechaFinCtrl.text);
+        if (fin != null && fin.isBefore(hoy)) {
+          setState(() {
+            fechaInicioCtrl.clear();
+            fechaFinCtrl.clear();
+          });
+        } else if (inicio != null && inicio.isBefore(hoy)) {
+          setState(() => fechaInicioCtrl.text = _fechaIso(hoy));
+        }
+      }
       final filtrosActivos = [
         origenCtrl,
         destinoCtrl,
@@ -139,47 +205,64 @@ class _VuelosPageState extends State<VuelosPage> with RouteAware {
   }
 
   Future<void> _seleccionarFechaInicio(BuildContext context) async {
-    final hoy = DateUtils.dateOnly(DateTime.now());
-    final dateFin = DateTime.tryParse(fechaFinCtrl.text) ??
-        DateTime.now().add(const Duration(days: 365 * 2));
-    final limiteFin = dateFin.isBefore(hoy) ? hoy : dateFin;
-    final candidata = DateTime.tryParse(fechaInicioCtrl.text) ?? hoy;
-    final initial = candidata.isBefore(hoy)
-        ? hoy
-        : (candidata.isAfter(limiteFin) ? limiteFin : candidata);
+    final hoy = _hoyEcuador;
+    final minimo = _inicioBusqueda(hoy);
+    final maximo = _limiteBusqueda(hoy);
+    final limiteFin = _acotarFecha(
+        DateTime.tryParse(fechaFinCtrl.text) ?? maximo, minimo, maximo);
+    final initial = _acotarFecha(
+        DateTime.tryParse(fechaInicioCtrl.text) ?? hoy, minimo, limiteFin);
     final DateTime? picked = await showDatePicker(
       context: context,
       initialDate: initial,
-      firstDate: hoy,
+      currentDate: hoy,
+      firstDate: minimo,
       lastDate: limiteFin,
+      helpText: 'Selecciona la fecha inicial',
+      cancelText: 'Cancelar',
+      confirmText: 'Aceptar',
+      errorInvalidText: 'La fecha está fuera del rango permitido.',
+      errorFormatText: 'Ingrese una fecha válida.',
     );
-    if (picked != null) {
+    if (picked != null && mounted) {
       setState(() {
-        fechaInicioCtrl.text =
-            "${picked.year}-${picked.month.toString().padLeft(2, '0')}-${picked.day.toString().padLeft(2, '0')}";
+        fechaInicioCtrl.text = _fechaIso(picked);
+        final fin = DateTime.tryParse(fechaFinCtrl.text);
+        if (fin != null && (fin.isBefore(picked) || fin.isAfter(maximo))) {
+          fechaFinCtrl.clear();
+        }
       });
     }
   }
 
   Future<void> _seleccionarFechaFin(BuildContext context) async {
-    final hoy = DateUtils.dateOnly(DateTime.now());
-    final fechaInicio = DateTime.tryParse(fechaInicioCtrl.text) ?? hoy;
-    final dateInicio = fechaInicio.isBefore(hoy) ? hoy : fechaInicio;
-    final ultimoDia = DateTime.now().add(const Duration(days: 365 * 2));
-    final candidata = DateTime.tryParse(fechaFinCtrl.text) ?? dateInicio;
-    final initial = candidata.isBefore(dateInicio)
-        ? dateInicio
-        : (candidata.isAfter(ultimoDia) ? ultimoDia : candidata);
+    final hoy = _hoyEcuador;
+    final minimo = _inicioBusqueda(hoy);
+    final ultimoDia = _limiteBusqueda(hoy);
+    final dateInicio = _acotarFecha(
+        DateTime.tryParse(fechaInicioCtrl.text) ?? minimo, minimo, ultimoDia);
+    final initial = _acotarFecha(
+        DateTime.tryParse(fechaFinCtrl.text) ?? hoy, dateInicio, ultimoDia);
     final DateTime? picked = await showDatePicker(
       context: context,
       initialDate: initial,
+      currentDate: hoy,
       firstDate: dateInicio,
       lastDate: ultimoDia,
+      helpText: 'Selecciona la fecha final',
+      cancelText: 'Cancelar',
+      confirmText: 'Aceptar',
+      errorInvalidText: 'La fecha está fuera del rango permitido.',
+      errorFormatText: 'Ingrese una fecha válida.',
     );
-    if (picked != null) {
+    if (picked != null && mounted) {
       setState(() {
-        fechaFinCtrl.text =
-            "${picked.year}-${picked.month.toString().padLeft(2, '0')}-${picked.day.toString().padLeft(2, '0')}";
+        fechaFinCtrl.text = _fechaIso(picked);
+        final inicio = DateTime.tryParse(fechaInicioCtrl.text);
+        if (inicio != null &&
+            (inicio.isAfter(picked) || inicio.isBefore(minimo))) {
+          fechaInicioCtrl.clear();
+        }
       });
     }
   }
@@ -235,6 +318,7 @@ class _VuelosPageState extends State<VuelosPage> with RouteAware {
   }
 
   Future<void> confirmarEliminacion(Vuelo vuelo) async {
+    if (vuelo.reservasActivas > 0) return;
     final confirmar = await showDialog<bool>(
       context: context,
       builder: (context) => AlertDialog(
@@ -429,6 +513,7 @@ class _VuelosPageState extends State<VuelosPage> with RouteAware {
 
   @override
   Widget build(BuildContext context) {
+    final resultados = vuelosOrdenados;
     return Scaffold(
       backgroundColor: AeroColors.ice,
       appBar: AppBar(
@@ -479,14 +564,7 @@ class _VuelosPageState extends State<VuelosPage> with RouteAware {
               tooltip: "Mis reservas",
             ),
           IconButton(
-            onPressed: () async {
-              final navigator = Navigator.of(context);
-              await AuthService().logout();
-              navigator.pushAndRemoveUntil(
-                MaterialPageRoute(builder: (_) => const LoginPage()),
-                (route) => false,
-              );
-            },
+            onPressed: () => AuthService().logout(),
             icon: const Icon(Icons.logout),
             tooltip: "Cerrar sesión",
           ),
@@ -700,22 +778,38 @@ class _VuelosPageState extends State<VuelosPage> with RouteAware {
             Padding(
               padding: const EdgeInsets.fromLTRB(18, 4, 18, 6),
               child: Row(children: [
-                const Expanded(
-                    child: Text('Vuelos disponibles',
-                        style: TextStyle(
+                Expanded(
+                    child: Text(
+                        esAdmin ? 'Red de vuelos' : 'Vuelos disponibles',
+                        style: const TextStyle(
                             fontSize: 20,
                             fontWeight: FontWeight.w700,
                             color: AeroColors.ink))),
-                Container(
-                    padding:
-                        const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-                    decoration: BoxDecoration(
-                        color: AeroColors.blue.withValues(alpha: .09),
-                        borderRadius: BorderRadius.circular(20)),
-                    child: Text('${vuelos.length} opciones',
-                        style: const TextStyle(
-                            color: AeroColors.blue,
-                            fontWeight: FontWeight.w700))),
+                Text('${resultados.length} vuelos',
+                    style:
+                        const TextStyle(color: AeroColors.muted, fontSize: 12)),
+                PopupMenuButton<OrdenVuelos>(
+                  tooltip: 'Ordenar vuelos',
+                  initialValue: orden,
+                  onSelected: (valor) => setState(() => orden = valor),
+                  itemBuilder: (_) => [
+                    for (final opcion in OrdenVuelos.values)
+                      PopupMenuItem(
+                          value: opcion, child: Text(opcion.etiqueta)),
+                  ],
+                  child: Padding(
+                    padding: const EdgeInsets.all(10),
+                    child: Row(mainAxisSize: MainAxisSize.min, children: [
+                      const Icon(Icons.sort, color: AeroColors.blue, size: 20),
+                      const SizedBox(width: 4),
+                      Text(orden.etiqueta,
+                          style: const TextStyle(
+                              color: AeroColors.navy,
+                              fontWeight: FontWeight.w700,
+                              fontSize: 12)),
+                    ]),
+                  ),
+                ),
               ]),
             ),
           // Error Feedback
@@ -777,18 +871,23 @@ class _VuelosPageState extends State<VuelosPage> with RouteAware {
                     : ListView.builder(
                         padding: const EdgeInsets.symmetric(
                             horizontal: 16, vertical: 8),
-                        itemCount: vuelos.length,
+                        itemCount: resultados.length,
                         itemBuilder: (context, index) {
-                          final vuelo = vuelos[index];
-                          return VueloCard(
-                            vuelo: vuelo,
-                            onReservar: () => abrirSeleccionAsientos(vuelo),
-                            onEditar: esAdmin
-                                ? () => abrirFormularioVuelo(vuelo)
-                                : null,
-                            onEliminar: esAdmin
-                                ? () => confirmarEliminacion(vuelo)
-                                : null,
+                          final vuelo = resultados[index];
+                          return Center(
+                            child: ConstrainedBox(
+                              constraints: const BoxConstraints(maxWidth: 1180),
+                              child: VueloCard(
+                                vuelo: vuelo,
+                                onReservar: () => abrirSeleccionAsientos(vuelo),
+                                onEditar: esAdmin
+                                    ? () => abrirFormularioVuelo(vuelo)
+                                    : null,
+                                onEliminar: esAdmin
+                                    ? () => confirmarEliminacion(vuelo)
+                                    : null,
+                              ),
+                            ),
                           );
                         },
                       ),

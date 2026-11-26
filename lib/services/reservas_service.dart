@@ -86,8 +86,8 @@ class ReservasService {
     }
   }
 
-  Future<void> actualizarReservaAsientos(
-      int reservaId, List<String> asientos) async {
+  Future<void> actualizarReservaAsientos(int reservaId, List<String> asientos,
+      {double? totalEsperado}) async {
     final url =
         Uri.parse("${ApiConfig.baseUrl}/api/reservas/$reservaId/asientos");
 
@@ -99,6 +99,7 @@ class ReservasService {
       },
       body: jsonEncode({
         "asientos": asientos,
+        if (totalEsperado != null) "total_esperado": totalEsperado,
       }),
     );
 
@@ -108,6 +109,9 @@ class ReservasService {
         throw const SesionExpiradaException();
       }
       if (response.statusCode == 409) {
+        if (jsonDecode(response.body)["codigo"] == "TARIFA_ACTUALIZADA") {
+          throw const TarifaActualizadaException();
+        }
         final mensaje = _obtenerMensajeError(response.body);
         if (mensaje.contains("ya fue modificada") ||
             mensaje.contains("nuevos cambios")) {

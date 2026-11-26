@@ -31,6 +31,7 @@ class AsientoService {
   Future<Map<String, dynamic>> reservarAsientos({
     required int vueloId,
     required List<String> asientos,
+    double? totalEsperado,
   }) async {
     final url = Uri.parse("${ApiConfig.baseUrl}/api/reservas/asientos");
 
@@ -43,6 +44,7 @@ class AsientoService {
       body: jsonEncode({
         "vuelo_id": vueloId,
         "asientos": asientos,
+        if (totalEsperado != null) "total_esperado": totalEsperado,
       }),
     );
 
@@ -56,6 +58,9 @@ class AsientoService {
     }
 
     if (response.statusCode == 409) {
+      if (jsonDecode(response.body)["codigo"] == "TARIFA_ACTUALIZADA") {
+        throw const TarifaActualizadaException();
+      }
       throw const ConflictoConcurrenciaException(
         "Otro cliente reservó uno de esos asientos al mismo tiempo. Actualizamos el mapa; revise los asientos disponibles y seleccione otro.",
       );

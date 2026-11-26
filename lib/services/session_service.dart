@@ -22,6 +22,10 @@ class ConflictoConcurrenciaException implements Exception {
   String toString() => mensaje;
 }
 
+class TarifaActualizadaException implements Exception {
+  const TarifaActualizadaException();
+}
+
 class ReservaActualizadaEnOtraPestanaException implements Exception {
   const ReservaActualizadaEnOtraPestanaException();
 
@@ -38,6 +42,29 @@ class SessionService {
   static Timer? _temporizadorExpiracion;
 
   static final ValueNotifier<int> sesionExpirada = ValueNotifier<int>(0);
+  static final ValueNotifier<int> sesionCerrada = ValueNotifier<int>(0);
+
+  static Stream<void> get cambiosEnOtraPestana =>
+      SessionStorage.cambios(_tokenKey);
+  static Stream<void> get reactivaciones => SessionStorage.reactivaciones;
+
+  static Future<void> verificarSesion() async {
+    final token = ApiConfig.token;
+    if (token.isEmpty) return;
+    if (_estaExpirado(token)) {
+      await expirar();
+      return;
+    }
+    final tokenGuardado = await SessionStorage.leer(_tokenKey);
+    if (tokenGuardado == token) return;
+    final mismoUsuario = tokenGuardado != null &&
+        !_estaExpirado(tokenGuardado) &&
+        await SessionStorage.leer(_usuarioKey) == ApiConfig.usuario;
+    if (ApiConfig.token == token && !mismoUsuario) {
+      _limpiarMemoria();
+      sesionCerrada.value++;
+    }
+  }
 
   static Future<void> guardar(
     String token,
@@ -45,14 +72,15 @@ class SessionService {
     required String usuario,
     required String nombreCompleto,
   }) async {
+    if (_estaExpirado(token)) throw const SesionExpiradaException();
+    await SessionStorage.escribir(_rolKey, rol);
+    await SessionStorage.escribir(_usuarioKey, usuario);
+    await SessionStorage.escribir(_nombreKey, nombreCompleto);
+    await SessionStorage.escribir(_tokenKey, token);
     ApiConfig.token = token;
     ApiConfig.rol = rol;
     ApiConfig.usuario = usuario;
     ApiConfig.nombreCompleto = nombreCompleto;
-    await SessionStorage.escribir(_tokenKey, token);
-    await SessionStorage.escribir(_rolKey, rol);
-    await SessionStorage.escribir(_usuarioKey, usuario);
-    await SessionStorage.escribir(_nombreKey, nombreCompleto);
     _programarExpiracion(token);
   }
 
@@ -63,6 +91,7 @@ class SessionService {
     final nombreCompleto = await SessionStorage.leer(_nombreKey) ?? '';
     if (token.isEmpty || _estaExpirado(token)) {
       await limpiar();
+      if (token.isNotEmpty) sesionExpirada.value++;
       return false;
     }
     ApiConfig.token = token;
@@ -75,28 +104,64 @@ class SessionService {
 
   static Future<void> expirar() async {
     if (ApiConfig.token.isEmpty) return;
-    await limpiar();
+    final limpieza = limpiar();
     sesionExpirada.value++;
+    await limpieza;
+  }
+
+  static Future<void> cerrar({bool todasLasPestanas = false}) async {
+    final token = ApiConfig.token;
+    if (token.isEmpty) return;
+    final usuario = ApiConfig.usuario;
+    _limpiarMemoria();
+    final limpieza = _limpiarAlmacenamiento(
+      token,
+      usuario: todasLasPestanas && usuario.isNotEmpty ? usuario : null,
+    );
+    sesionCerrada.value++;
+    await limpieza;
   }
 
   static Future<void> limpiar() async {
+    final token = ApiConfig.token;
+    _limpiarMemoria();
+    await _limpiarAlmacenamiento(token);
+  }
+
+  static void _limpiarMemoria() {
     _temporizadorExpiracion?.cancel();
     _temporizadorExpiracion = null;
     ApiConfig.token = '';
     ApiConfig.rol = 'cliente';
     ApiConfig.usuario = '';
     ApiConfig.nombreCompleto = '';
-    await SessionStorage.eliminar(_tokenKey);
-    await SessionStorage.eliminar(_rolKey);
-    await SessionStorage.eliminar(_usuarioKey);
-    await SessionStorage.eliminar(_nombreKey);
+  }
+
+  static Future<void> _limpiarAlmacenamiento(
+    String token, {
+    String? usuario,
+  }) async {
+    final mismoUsuario =
+        usuario != null && await SessionStorage.leer(_usuarioKey) == usuario;
+    final guardado = await SessionStorage.leer(_tokenKey);
+    if (ApiConfig.token.isNotEmpty ||
+        (guardado != null &&
+            guardado != token &&
+            !mismoUsuario &&
+            !_estaExpirado(guardado))) {
+      return;
+    }
+    await Future.wait([
+      SessionStorage.eliminar(_tokenKey),
+      SessionStorage.eliminar(_rolKey),
+      SessionStorage.eliminar(_usuarioKey),
+      SessionStorage.eliminar(_nombreKey),
+    ]);
   }
 
   static bool _estaExpirado(String token) {
     final expiracion = _expiracion(token);
-    return expiracion == null ||
-        !expiracion
-            .isAfter(DateTime.now().toUtc().add(const Duration(seconds: 2)));
+    return expiracion == null || !expiracion.isAfter(DateTime.now().toUtc());
   }
 
   static void _programarExpiracion(String token) {

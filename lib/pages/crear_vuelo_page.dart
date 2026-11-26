@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import '../models/vuelo.dart';
+import '../models/avion.dart';
+import '../widgets/vista_previa_avion.dart';
 import '../services/admin_vuelo_service.dart';
 import '../theme/aerotech_theme.dart';
 import '../widgets/aerotech_logo.dart';
@@ -21,7 +23,11 @@ class _CrearVueloPageState extends State<CrearVueloPage> {
   late final TextEditingController horaSalidaCtrl;
   late final TextEditingController horaLlegadaCtrl;
   late final TextEditingController precioCtrl;
-  late final TextEditingController cantidadAsientosCtrl;
+  late final TextEditingController precioEjecutivaCtrl;
+  List<Avion> aviones = [];
+  int? avionId;
+  bool cargandoAviones = true;
+  bool errorAviones = false;
 
   final AdminVueloService adminVueloService = AdminVueloService();
 
@@ -31,6 +37,46 @@ class _CrearVueloPageState extends State<CrearVueloPage> {
 
   bool get esEdicion => widget.vuelo != null;
 
+  // La API programa vuelos según el horario de Ecuador continental (UTC-5).
+  DateTime get _ahoraEcuador =>
+      DateTime.now().toUtc().subtract(const Duration(hours: 5));
+
+  DateTime get _hoyEcuador {
+    final ahora = _ahoraEcuador;
+    return DateTime(ahora.year, ahora.month, ahora.day);
+  }
+
+  DateTime _sumarDias(DateTime fecha, int dias) =>
+      DateTime(fecha.year, fecha.month, fecha.day + dias);
+
+  String _fechaIso(DateTime fecha) =>
+      '${fecha.year.toString().padLeft(4, '0')}-${fecha.month.toString().padLeft(2, '0')}-${fecha.day.toString().padLeft(2, '0')}';
+
+  String _horaTexto(TimeOfDay hora) =>
+      '${hora.hour.toString().padLeft(2, '0')}:${hora.minute.toString().padLeft(2, '0')}';
+
+  TimeOfDay? _horaValida(String valor) {
+    final partes = valor.split(':');
+    if (partes.length != 2) return null;
+    final hora = int.tryParse(partes[0]);
+    final minuto = int.tryParse(partes[1]);
+    if (hora == null ||
+        minuto == null ||
+        hora < 0 ||
+        hora > 23 ||
+        minuto < 0 ||
+        minuto > 59) {
+      return null;
+    }
+    return TimeOfDay(hour: hora, minute: minuto);
+  }
+
+  int _minutos(TimeOfDay hora) => hora.hour * 60 + hora.minute;
+
+  bool _salidaFutura(DateTime fecha, TimeOfDay hora) =>
+      DateTime.utc(fecha.year, fecha.month, fecha.day, hora.hour, hora.minute)
+          .isAfter(_ahoraEcuador);
+
   @override
   void initState() {
     super.initState();
@@ -39,16 +85,35 @@ class _CrearVueloPageState extends State<CrearVueloPage> {
     origenCtrl = TextEditingController(text: widget.vuelo?.origen ?? "Quito");
     destinoCtrl =
         TextEditingController(text: widget.vuelo?.destino ?? "Guayaquil");
-    fechaCtrl =
-        TextEditingController(text: widget.vuelo?.fecha ?? "2027-06-20");
+    fechaCtrl = TextEditingController(
+        text: widget.vuelo?.fecha ?? _fechaIso(_sumarDias(_hoyEcuador, 1)));
     horaSalidaCtrl = TextEditingController(
         text: widget.vuelo?.horaSalida.substring(0, 5) ?? "08:00");
     horaLlegadaCtrl = TextEditingController(
         text: widget.vuelo?.horaLlegada.substring(0, 5) ?? "09:00");
     precioCtrl =
         TextEditingController(text: widget.vuelo?.precio.toString() ?? "85.00");
-    cantidadAsientosCtrl = TextEditingController(
-        text: widget.vuelo?.totalAsientos.toString() ?? "12");
+    precioEjecutivaCtrl = TextEditingController(
+        text: (widget.vuelo?.precioEjecutiva ??
+                ((widget.vuelo?.precio ?? 85) * 1.5))
+            .toStringAsFixed(2));
+    avionId = widget.vuelo?.avionId;
+    cargarAviones();
+  }
+
+  Future<void> cargarAviones() async {
+    setState(() {
+      cargandoAviones = true;
+      errorAviones = false;
+    });
+    try {
+      final catalogo = await adminVueloService.listarAviones();
+      if (mounted) setState(() => aviones = catalogo);
+    } catch (_) {
+      if (mounted) setState(() => errorAviones = true);
+    } finally {
+      if (mounted) setState(() => cargandoAviones = false);
+    }
   }
 
   Future<void> guardarVuelo() async {
@@ -91,56 +156,55 @@ class _CrearVueloPageState extends State<CrearVueloPage> {
       return;
     }
 
-    final asientos = int.tryParse(cantidadAsientosCtrl.text.trim());
-    if (asientos == null || asientos <= 0) {
+    if (!esEdicion && avionId == null) {
       setState(() {
         guardando = false;
-        mensaje = "La cantidad de asientos debe ser mayor a cero.";
+        mensaje = "Selecciona una aeronave del catálogo.";
+      });
+      return;
+    }
+    final tarifaEjecutiva = double.tryParse(precioEjecutivaCtrl.text.trim());
+    if (avionId != null &&
+        (tarifaEjecutiva == null || tarifaEjecutiva <= precio)) {
+      setState(() {
+        guardando = false;
+        mensaje = "La tarifa ejecutiva debe ser mayor a la tarifa turista.";
       });
       return;
     }
 
-    final date = DateTime.tryParse(fechaCtrl.text.trim());
-    if (date != null) {
-      final now = DateTime.now();
-      if (DateUtils.isSameDay(date, now)) {
-        final timeParts = horaSalidaCtrl.text.trim().split(":");
-        if (timeParts.length == 2) {
-          final hour = int.tryParse(timeParts[0]) ?? 0;
-          final minute = int.tryParse(timeParts[1]) ?? 0;
-          final departureDateTime =
-              DateTime(date.year, date.month, date.day, hour, minute);
-          if (departureDateTime.isBefore(now)) {
-            setState(() {
-              guardando = false;
-              mensaje =
-                  "La hora de salida no puede ser anterior a la hora actual.";
-            });
-            return;
-          }
-        }
+    final fecha = DateTime.tryParse(fechaCtrl.text.trim());
+    final salida = _horaValida(horaSalidaCtrl.text.trim());
+    final llegada = _horaValida(horaLlegadaCtrl.text.trim());
+    final hoy = _hoyEcuador;
+    final itinerarioSinCambios = esEdicion &&
+        fechaCtrl.text == widget.vuelo!.fecha &&
+        horaSalidaCtrl.text == widget.vuelo!.horaSalida.substring(0, 5) &&
+        horaLlegadaCtrl.text == widget.vuelo!.horaLlegada.substring(0, 5);
+    String? errorItinerario;
+    if (fecha == null ||
+        _fechaIso(fecha) != fechaCtrl.text.trim() ||
+        salida == null ||
+        llegada == null) {
+      errorItinerario = 'Ingrese una fecha y horarios válidos.';
+    } else if (!itinerarioSinCambios) {
+      if (fecha.isBefore(hoy) || fecha.isAfter(_sumarDias(hoy, 730))) {
+        errorItinerario =
+            'La fecha debe estar entre hoy y los próximos 730 días.';
+      } else if (!_salidaFutura(fecha, salida)) {
+        errorItinerario =
+            'La fecha y hora de salida deben ser posteriores a las actuales.';
+      } else if (_minutos(llegada) <= _minutos(salida)) {
+        errorItinerario =
+            'La hora de llegada debe ser posterior a la de salida.';
       }
     }
-
-    final timePartsSalida = horaSalidaCtrl.text.trim().split(":");
-    final timePartsLlegada = horaLlegadaCtrl.text.trim().split(":");
-    if (timePartsSalida.length == 2 && timePartsLlegada.length == 2) {
-      final hourSalida = int.tryParse(timePartsSalida[0]) ?? 0;
-      final minuteSalida = int.tryParse(timePartsSalida[1]) ?? 0;
-      final hourLlegada = int.tryParse(timePartsLlegada[0]) ?? 0;
-      final minuteLlegada = int.tryParse(timePartsLlegada[1]) ?? 0;
-
-      final minutosSalida = hourSalida * 60 + minuteSalida;
-      final minutosLlegada = hourLlegada * 60 + minuteLlegada;
-
-      if (minutosLlegada <= minutosSalida) {
-        setState(() {
-          guardando = false;
-          mensaje =
-              "La hora de llegada debe ser posterior a la hora de salida.";
-        });
-        return;
-      }
+    if (errorItinerario != null) {
+      setState(() {
+        guardando = false;
+        mensaje = errorItinerario!;
+      });
+      return;
     }
 
     try {
@@ -154,7 +218,8 @@ class _CrearVueloPageState extends State<CrearVueloPage> {
           horaSalida: horaSalidaCtrl.text.trim(),
           horaLlegada: horaLlegadaCtrl.text.trim(),
           precio: double.parse(precioCtrl.text.trim()),
-          cantidadAsientos: int.parse(cantidadAsientosCtrl.text.trim()),
+          precioEjecutiva: avionId != null ? tarifaEjecutiva : null,
+          avionId: avionId,
         );
 
         if (!mounted) return;
@@ -173,7 +238,8 @@ class _CrearVueloPageState extends State<CrearVueloPage> {
           horaSalida: horaSalidaCtrl.text.trim(),
           horaLlegada: horaLlegadaCtrl.text.trim(),
           precio: double.parse(precioCtrl.text.trim()),
-          cantidadAsientos: int.parse(cantidadAsientosCtrl.text.trim()),
+          precioEjecutiva: tarifaEjecutiva,
+          avionId: avionId!,
         );
 
         final vueloJson = respuesta["vuelo"] as Map<String, dynamic>;
@@ -187,6 +253,7 @@ class _CrearVueloPageState extends State<CrearVueloPage> {
         });
       }
     } catch (e) {
+      if (!mounted) return;
       setState(() {
         exito = false;
         mensaje = "Error: $e";
@@ -197,81 +264,79 @@ class _CrearVueloPageState extends State<CrearVueloPage> {
   }
 
   Future<void> _seleccionarFecha(BuildContext context) async {
-    final hoy = DateUtils.dateOnly(DateTime.now());
+    final hoy = _hoyEcuador;
+    final limite = _sumarDias(hoy, 730);
     final actual = DateTime.tryParse(fechaCtrl.text);
+    final inicial = actual == null || actual.isBefore(hoy)
+        ? hoy
+        : actual.isAfter(limite)
+            ? limite
+            : actual;
     final DateTime? picked = await showDatePicker(
       context: context,
-      initialDate: actual != null && !actual.isBefore(hoy) ? actual : hoy,
+      initialDate: inicial,
+      currentDate: hoy,
       firstDate: hoy,
-      lastDate: DateTime.now().add(const Duration(days: 365 * 2)),
+      lastDate: limite,
+      helpText: 'Selecciona la fecha del vuelo',
+      cancelText: 'Cancelar',
+      confirmText: 'Aceptar',
+      errorInvalidText: 'La fecha está fuera del rango permitido.',
+      errorFormatText: 'Ingrese una fecha válida.',
     );
-    if (picked != null) {
+    if (picked != null && mounted) {
       setState(() {
-        fechaCtrl.text =
-            "${picked.year}-${picked.month.toString().padLeft(2, '0')}-${picked.day.toString().padLeft(2, '0')}";
+        fechaCtrl.text = _fechaIso(picked);
+        final salida = _horaValida(horaSalidaCtrl.text);
+        if (salida != null && !_salidaFutura(picked, salida)) {
+          horaSalidaCtrl.clear();
+          horaLlegadaCtrl.clear();
+          mensaje = 'Selecciona nuevos horarios: la salida anterior ya pasó.';
+        } else {
+          mensaje = '';
+        }
       });
     }
   }
 
   Future<void> _seleccionarHora(
       BuildContext context, TextEditingController controller) async {
-    final parts = controller.text.split(":");
-    final initialHour = parts.isNotEmpty ? (int.tryParse(parts[0]) ?? 8) : 8;
-    final initialMinute = parts.length > 1 ? (int.tryParse(parts[1]) ?? 0) : 0;
-
     final TimeOfDay? picked = await showTimePicker(
       context: context,
-      initialTime: TimeOfDay(hour: initialHour, minute: initialMinute),
+      initialTime:
+          _horaValida(controller.text) ?? TimeOfDay.fromDateTime(_ahoraEcuador),
+      cancelText: 'Cancelar',
+      confirmText: 'Aceptar',
     );
-    if (picked != null) {
-      final date = DateTime.tryParse(fechaCtrl.text.trim());
-      if (date != null) {
-        final now = DateTime.now();
-        if (DateUtils.isSameDay(date, now)) {
-          final selectedTime = DateTime(
-              date.year, date.month, date.day, picked.hour, picked.minute);
-          if (selectedTime.isBefore(now)) {
-            if (!context.mounted) return;
-            ScaffoldMessenger.of(context).showSnackBar(
-              SnackBar(
-                content: const Text(
-                    "La hora no puede ser anterior a la hora actual."),
-                backgroundColor: Colors.red.shade700,
-                behavior: SnackBarBehavior.floating,
-              ),
-            );
-            return;
-          }
-        }
-      }
-
-      if (controller == horaLlegadaCtrl) {
-        final timePartsSalida = horaSalidaCtrl.text.trim().split(":");
-        if (timePartsSalida.length == 2) {
-          final hourSalida = int.tryParse(timePartsSalida[0]) ?? 0;
-          final minuteSalida = int.tryParse(timePartsSalida[1]) ?? 0;
-          final minsSalida = hourSalida * 60 + minuteSalida;
-          final minsLlegada = picked.hour * 60 + picked.minute;
-          if (minsLlegada <= minsSalida) {
-            if (!context.mounted) return;
-            ScaffoldMessenger.of(context).showSnackBar(
-              SnackBar(
-                content: const Text(
-                    "La hora de llegada debe ser posterior a la de salida."),
-                backgroundColor: Colors.red.shade700,
-                behavior: SnackBarBehavior.floating,
-              ),
-            );
-            return;
-          }
-        }
-      }
-
-      setState(() {
-        controller.text =
-            "${picked.hour.toString().padLeft(2, '0')}:${picked.minute.toString().padLeft(2, '0')}";
-      });
+    if (picked == null || !mounted || !context.mounted) return;
+    final fecha = DateTime.tryParse(fechaCtrl.text);
+    final salida = _horaValida(horaSalidaCtrl.text);
+    final llegada = _horaValida(horaLlegadaCtrl.text);
+    String? error;
+    if (fecha == null || !_salidaFutura(fecha, picked)) {
+      error = 'La fecha y hora deben ser posteriores a las actuales.';
+    } else if (controller == horaLlegadaCtrl &&
+        (salida == null || _minutos(picked) <= _minutos(salida))) {
+      error = 'Selecciona primero una salida. La llegada debe ser posterior.';
     }
+    if (error != null) {
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+        content: Text(error),
+        backgroundColor: Colors.red.shade700,
+        behavior: SnackBarBehavior.floating,
+      ));
+      return;
+    }
+    setState(() {
+      controller.text = _horaTexto(picked);
+      mensaje = '';
+      if (controller == horaSalidaCtrl &&
+          llegada != null &&
+          _minutos(llegada) <= _minutos(picked)) {
+        horaLlegadaCtrl.clear();
+        mensaje = 'Selecciona una nueva hora de llegada posterior a la salida.';
+      }
+    });
   }
 
   @override
@@ -283,8 +348,95 @@ class _CrearVueloPageState extends State<CrearVueloPage> {
     horaSalidaCtrl.dispose();
     horaLlegadaCtrl.dispose();
     precioCtrl.dispose();
-    cantidadAsientosCtrl.dispose();
+    precioEjecutivaCtrl.dispose();
     super.dispose();
+  }
+
+  Widget selectorAvion() {
+    if (cargandoAviones) {
+      return const LinearProgressIndicator(
+          semanticsLabel: 'Cargando aeronaves');
+    }
+    if (errorAviones || aviones.isEmpty) {
+      return OutlinedButton.icon(
+        onPressed: cargarAviones,
+        icon: const Icon(Icons.refresh),
+        label: const Text('Reintentar catálogo de aeronaves'),
+      );
+    }
+    final seleccionado =
+        aviones.where((avion) => avion.id == avionId).firstOrNull;
+    final conReservas = esEdicion &&
+        widget.vuelo!.asientosDisponibles < widget.vuelo!.totalAsientos;
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        DropdownButtonFormField<int>(
+          initialValue: seleccionado?.id,
+          isExpanded: true,
+          decoration: const InputDecoration(
+            labelText: 'Aeronave',
+            prefixIcon: Icon(Icons.airplanemode_active, color: AeroColors.navy),
+          ),
+          hint:
+              Text(esEdicion ? 'Conservar cabina actual' : 'Seleccionar avión'),
+          items: [
+            for (final avion in aviones)
+              DropdownMenuItem(
+                value: avion.id,
+                child: Text('${avion.modelo} · ${avion.capacidad} asientos',
+                    overflow: TextOverflow.ellipsis),
+              ),
+          ],
+          onChanged: guardando || conReservas
+              ? null
+              : (id) => setState(() => avionId = id),
+        ),
+        const SizedBox(height: 12),
+        if (seleccionado != null)
+          Container(
+            width: double.infinity,
+            padding: const EdgeInsets.all(16),
+            decoration: BoxDecoration(
+              color: AeroColors.ice,
+              borderRadius: BorderRadius.circular(12),
+              border: Border.all(color: AeroColors.line),
+            ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text('${seleccionado.capacidad} asientos en total',
+                    style: const TextStyle(fontWeight: FontWeight.w700)),
+                const SizedBox(height: 8),
+                Wrap(
+                  spacing: 20,
+                  runSpacing: 8,
+                  children: [
+                    Text('Ejecutiva: ${seleccionado.ejecutiva}',
+                        style: const TextStyle(color: AeroColors.navy)),
+                    Text('Turista: ${seleccionado.turista}',
+                        style: const TextStyle(color: AeroColors.muted)),
+                  ],
+                ),
+                const SizedBox(height: 16),
+                VistaPreviaAvion(
+                  key: ValueKey(seleccionado.id),
+                  avion: seleccionado,
+                ),
+              ],
+            ),
+          )
+        else if (esEdicion)
+          Text('Capacidad actual: ${widget.vuelo!.totalAsientos} asientos.',
+              style: const TextStyle(color: AeroColors.muted)),
+        if (conReservas)
+          const Padding(
+            padding: EdgeInsets.only(top: 8),
+            child: Text('La aeronave se conserva porque existen reservas.',
+                style: TextStyle(color: AeroColors.muted)),
+          ),
+      ],
+    );
   }
 
   Widget campo({
@@ -403,7 +555,8 @@ class _CrearVueloPageState extends State<CrearVueloPage> {
                           color: AeroColors.cyan,
                         ),
                         const SizedBox(width: 12),
-                        Text(
+                        Expanded(
+                            child: Text(
                           esEdicion
                               ? "Modificar Datos del Vuelo"
                               : "Datos del Vuelo",
@@ -412,14 +565,14 @@ class _CrearVueloPageState extends State<CrearVueloPage> {
                             fontWeight: FontWeight.bold,
                             color: AeroColors.navy,
                           ),
-                        ),
+                        )),
                       ],
                     ),
                     const SizedBox(height: 10),
                     Text(
                       esEdicion
-                          ? "Actualice el itinerario y la capacidad. La capacidad nunca podrá quedar por debajo de los asientos ya reservados."
-                          : "Ingrese la información para el nuevo itinerario. El sistema creará los asientos automáticamente.",
+                          ? "Actualice el itinerario y la aeronave asignada."
+                          : "Seleccione la aeronave para generar los asientos de ambas clases automáticamente.",
                       style: TextStyle(
                         fontSize: 14,
                         color: Colors.grey.shade600,
@@ -495,36 +648,32 @@ class _CrearVueloPageState extends State<CrearVueloPage> {
                         ),
                       ],
                     ),
-                    Row(
-                      children: [
-                        Expanded(
-                          child: campo(
-                            controller: precioCtrl,
-                            label: "Precio (USD)",
-                            icon: Icons.attach_money,
-                            keyboardType: const TextInputType.numberWithOptions(
-                                decimal: true),
-                            inputFormatters: [
-                              FilteringTextInputFormatter.allow(
-                                  RegExp(r'^\d*\.?\d*')),
-                            ],
-                          ),
-                        ),
-                        const SizedBox(width: 16),
-                        Expanded(
-                          child: campo(
-                            controller: cantidadAsientosCtrl,
-                            label: "Capacidad total",
-                            icon: Icons.event_seat,
-                            keyboardType: TextInputType.number,
-                            inputFormatters: [
-                              FilteringTextInputFormatter.digitsOnly,
-                              LengthLimitingTextInputFormatter(3),
-                            ],
-                          ),
-                        ),
+                    campo(
+                      controller: precioCtrl,
+                      label: "Tarifa turista (USD)",
+                      icon: Icons.attach_money,
+                      keyboardType:
+                          const TextInputType.numberWithOptions(decimal: true),
+                      inputFormatters: [
+                        FilteringTextInputFormatter.allow(
+                            RegExp(r'^\d*\.?\d*')),
                       ],
                     ),
+                    selectorAvion(),
+                    if (avionId != null) ...[
+                      const SizedBox(height: 16),
+                      campo(
+                        controller: precioEjecutivaCtrl,
+                        label: "Tarifa ejecutiva (USD)",
+                        icon: Icons.airline_seat_recline_extra,
+                        keyboardType: const TextInputType.numberWithOptions(
+                            decimal: true),
+                        inputFormatters: [
+                          FilteringTextInputFormatter.allow(
+                              RegExp(r'^\d*\.?\d{0,2}')),
+                        ],
+                      ),
+                    ],
                     const SizedBox(height: 16),
                     SizedBox(
                       width: double.infinity,
@@ -538,7 +687,12 @@ class _CrearVueloPageState extends State<CrearVueloPage> {
                             borderRadius: BorderRadius.circular(12),
                           ),
                         ),
-                        onPressed: guardando ? null : guardarVuelo,
+                        onPressed: guardando ||
+                                cargandoAviones ||
+                                errorAviones ||
+                                (!esEdicion && avionId == null)
+                            ? null
+                            : guardarVuelo,
                         icon: guardando
                             ? const SizedBox(
                                 width: 20,

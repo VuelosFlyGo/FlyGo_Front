@@ -22,6 +22,7 @@ class ReservaCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final bool activa = reserva.estado == "ACTIVA";
+    final bool puedeCancelar = reserva.puedeCancelar;
     final String asientosTexto =
         reserva.asientos.isEmpty ? "No asignados" : reserva.asientos.join(", ");
 
@@ -222,6 +223,22 @@ class ReservaCard extends StatelessWidget {
                     ],
                   ),
                 ),
+                if (activa && !puedeCancelar) ...[
+                  const SizedBox(height: 12),
+                  Row(
+                    children: [
+                      Icon(Icons.lock_clock_outlined,
+                          size: 17, color: Colors.amber.shade900),
+                      const SizedBox(width: 8),
+                      const Expanded(
+                        child: Text(
+                          'Cancelación no disponible. Se requiere un mínimo de 24 horas antes de la salida del vuelo.',
+                          style: TextStyle(fontSize: 12),
+                        ),
+                      ),
+                    ],
+                  ),
+                ],
                 if (reserva.modificada) ...[
                   const SizedBox(height: 12),
                   Container(
@@ -292,31 +309,33 @@ class ReservaCard extends StatelessWidget {
                     style: TextButton.styleFrom(
                       foregroundColor: Colors.red.shade700,
                     ),
-                    onPressed: () {
-                      showDialog(
-                        context: context,
-                        builder: (context) => AlertDialog(
-                          title: const Text("Cancelar Reserva"),
-                          content: const Text(
-                              "¿Está seguro de que desea cancelar esta reserva? Esta acción no se puede deshacer."),
-                          actions: [
-                            TextButton(
-                              onPressed: () => Navigator.pop(context),
-                              child: const Text("No, mantener"),
-                            ),
-                            TextButton(
-                              onPressed: () {
-                                Navigator.pop(context);
-                                onCancelar();
-                              },
-                              style: TextButton.styleFrom(
-                                  foregroundColor: Colors.red),
-                              child: const Text("Sí, cancelar"),
-                            ),
-                          ],
-                        ),
-                      );
-                    },
+                    onPressed: !puedeCancelar
+                        ? null
+                        : () {
+                            showDialog(
+                              context: context,
+                              builder: (context) => AlertDialog(
+                                title: const Text("Cancelar Reserva"),
+                                content: const Text(
+                                    "¿Está seguro de que desea cancelar esta reserva? Solo se permite hasta 24 horas antes de la salida. Esta acción no se puede deshacer."),
+                                actions: [
+                                  TextButton(
+                                    onPressed: () => Navigator.pop(context),
+                                    child: const Text("No, mantener"),
+                                  ),
+                                  TextButton(
+                                    onPressed: () {
+                                      Navigator.pop(context);
+                                      onCancelar();
+                                    },
+                                    style: TextButton.styleFrom(
+                                        foregroundColor: Colors.red),
+                                    child: const Text("Sí, cancelar"),
+                                  ),
+                                ],
+                              ),
+                            );
+                          },
                     icon: const Icon(Icons.cancel_outlined, size: 16),
                     label: const Text(
                       "Cancelar",

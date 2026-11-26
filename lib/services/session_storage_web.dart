@@ -3,6 +3,16 @@ import 'dart:convert';
 import 'dart:html' as html;
 
 class SessionStorage {
+  static Stream<void> cambios(String clave) => html.window.onStorage
+      .where((evento) =>
+          evento.key == null ||
+          evento.key == clave ||
+          evento.key == 'flutter.$clave')
+      .map<void>((_) {});
+
+  static Stream<void> get reactivaciones =>
+      html.window.onFocus.map<void>((_) {});
+
   static Future<String?> leer(String clave) async {
     final actual = html.window.localStorage[clave];
     if (actual != null) return actual;

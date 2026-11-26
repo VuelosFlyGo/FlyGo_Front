@@ -128,7 +128,14 @@ class _SeleccionAsientosPageState extends State<SeleccionAsientosPage>
   }
 
   double get total {
-    return seleccionados.length * widget.vuelo.precio;
+    return asientos
+            .where((asiento) => seleccionados.contains(asiento.numeroAsiento))
+            .fold<int>(
+                0,
+                (suma, asiento) =>
+                    suma +
+                    ((asiento.precio ?? widget.vuelo.precio) * 100).round()) /
+        100;
   }
 
   bool get hayCambioReal {
@@ -138,7 +145,7 @@ class _SeleccionAsientosPageState extends State<SeleccionAsientosPage>
     return !seleccionados.toSet().containsAll(originales);
   }
 
-  Future<bool> confirmarCambioDefinitivo() async {
+  Future<bool> confirmarCambioDefinitivo(double totalConfirmado) async {
     final originales = widget.asientosIniciales?.length ?? 0;
     final adicionales = seleccionados.length - originales;
     return await showDialog<bool>(
@@ -156,7 +163,7 @@ class _SeleccionAsientosPageState extends State<SeleccionAsientosPage>
                 ),
                 const SizedBox(height: 18),
                 Text(
-                  "${seleccionados.length} asientos · \$${total.toStringAsFixed(2)}",
+                  "${seleccionados.length} asientos · \$${totalConfirmado.toStringAsFixed(2)}",
                   style: const TextStyle(fontWeight: FontWeight.w800),
                 ),
                 if (adicionales > 0)
@@ -183,6 +190,8 @@ class _SeleccionAsientosPageState extends State<SeleccionAsientosPage>
   }
 
   Future<void> reservar() async {
+    final totalConfirmado = total;
+    final asientosConfirmados = List<String>.of(seleccionados);
     if (seleccionados.isEmpty) {
       setState(() {
         mensaje = "Debe seleccionar al menos un asiento.";
@@ -205,7 +214,7 @@ class _SeleccionAsientosPageState extends State<SeleccionAsientosPage>
         });
         return;
       }
-      final confirmado = await confirmarCambioDefinitivo();
+      final confirmado = await confirmarCambioDefinitivo(totalConfirmado);
       if (!confirmado || !mounted) return;
     }
 
@@ -218,7 +227,8 @@ class _SeleccionAsientosPageState extends State<SeleccionAsientosPage>
       if (widget.editReservaId != null) {
         await ReservasService().actualizarReservaAsientos(
           widget.editReservaId!,
-          seleccionados,
+          asientosConfirmados,
+          totalEsperado: totalConfirmado,
         );
 
         if (!mounted) return;
@@ -266,7 +276,8 @@ class _SeleccionAsientosPageState extends State<SeleccionAsientosPage>
       } else {
         final respuesta = await asientoService.reservarAsientos(
           vueloId: widget.vuelo.id,
-          asientos: seleccionados,
+          asientos: asientosConfirmados,
+          totalEsperado: totalConfirmado,
         );
 
         final codigo = respuesta["reserva"]["codigo_reserva"];
@@ -315,6 +326,11 @@ class _SeleccionAsientosPageState extends State<SeleccionAsientosPage>
         ),
       );
       if (mounted) Navigator.pop(context, true);
+    } on TarifaActualizadaException {
+      if (!mounted) return;
+      setState(() => mensaje =
+          "La tarifa cambió. Revisa el nuevo total antes de confirmar.");
+      await cargarAsientos(limpiarMensaje: false);
     } on ConflictoConcurrenciaException catch (e) {
       if (!mounted) return;
       setState(() {
@@ -463,7 +479,11 @@ class _SeleccionAsientosPageState extends State<SeleccionAsientosPage>
                           ),
                           const SizedBox(height: 4),
                           Text(
-                            "${vuelo.aerolinea} | ${vuelo.fecha}",
+                            [
+                              vuelo.aerolinea,
+                              if (vuelo.avionModelo != null) vuelo.avionModelo!,
+                              vuelo.fecha,
+                            ].join(' · '),
                             style: TextStyle(
                                 fontSize: 13, color: Colors.grey.shade600),
                           ),
@@ -473,15 +493,6 @@ class _SeleccionAsientosPageState extends State<SeleccionAsientosPage>
                                 fontSize: 13, color: Colors.grey.shade600),
                           ),
                         ],
-                      ),
-                    ),
-                    const VerticalDivider(width: 20, thickness: 1),
-                    Text(
-                      "\$${vuelo.precio.toStringAsFixed(2)} / c.u",
-                      style: TextStyle(
-                        fontSize: 15,
-                        fontWeight: FontWeight.bold,
-                        color: Colors.blue.shade900,
                       ),
                     ),
                   ],
@@ -600,8 +611,12 @@ class _SeleccionAsientosPageState extends State<SeleccionAsientosPage>
                         ),
                         elevation: 2,
                       ),
-                      onPressed:
-                          (reservando || !hayCambioReal) ? null : reservar,
+                      onPressed: (reservando ||
+                              cargando ||
+                              asientos.isEmpty ||
+                              !hayCambioReal)
+                          ? null
+                          : reservar,
                       icon: const Icon(Icons.check_circle_outline),
                       label: Text(
                         reservando

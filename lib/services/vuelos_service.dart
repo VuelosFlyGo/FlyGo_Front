@@ -43,6 +43,12 @@ class VuelosService {
       throw const SesionExpiradaException();
     }
 
+    if (response.statusCode == 400) {
+      final dynamic data = jsonDecode(response.body);
+      if (data is Map && data['error'] is String) {
+        throw Exception(data['error']);
+      }
+    }
     throw Exception("No se pudieron obtener los vuelos");
   }
 }

@@ -2,10 +2,29 @@ import 'dart:convert';
 import 'package:http/http.dart' as http;
 import '../config/api_config.dart';
 import '../models/admin_dashboard.dart';
+import '../models/avion.dart';
 import 'session_service.dart';
 import 'servidor_no_disponible_exception.dart';
 
 class AdminVueloService {
+  Future<List<Avion>> listarAviones() async {
+    final url = Uri.parse("${ApiConfig.baseUrl}/api/admin/aviones");
+    final respuesta = await http.get(
+      url,
+      headers: {"Authorization": "Bearer ${ApiConfig.token}"},
+    );
+    if (respuesta.statusCode == 200) {
+      return (jsonDecode(respuesta.body) as List)
+          .map((item) => Avion.fromJson(item as Map<String, dynamic>))
+          .toList();
+    }
+    if (respuesta.statusCode == 401) {
+      await SessionService.expirar();
+      throw const SesionExpiradaException();
+    }
+    throw Exception("No se pudo cargar el catálogo de aeronaves.");
+  }
+
   Future<AdminDashboardData> obtenerDashboard() async {
     final url = Uri.parse("${ApiConfig.baseUrl}/api/admin/dashboard");
     late http.Response response;
@@ -38,7 +57,8 @@ class AdminVueloService {
     required String horaSalida,
     required String horaLlegada,
     required double precio,
-    required int cantidadAsientos,
+    double? precioEjecutiva,
+    required int avionId,
   }) async {
     final url = Uri.parse("${ApiConfig.baseUrl}/api/admin/vuelos");
 
@@ -56,7 +76,8 @@ class AdminVueloService {
         "hora_salida": horaSalida,
         "hora_llegada": horaLlegada,
         "precio": precio,
-        "cantidad_asientos": cantidadAsientos,
+        "precio_ejecutiva": precioEjecutiva,
+        "avion_id": avionId,
       }),
     );
 
@@ -81,7 +102,8 @@ class AdminVueloService {
     required String horaSalida,
     required String horaLlegada,
     required double precio,
-    required int cantidadAsientos,
+    double? precioEjecutiva,
+    required int? avionId,
   }) async {
     final url = Uri.parse("${ApiConfig.baseUrl}/api/admin/vuelos/$id");
 
@@ -99,7 +121,8 @@ class AdminVueloService {
         "hora_salida": horaSalida,
         "hora_llegada": horaLlegada,
         "precio": precio,
-        "cantidad_asientos": cantidadAsientos,
+        "precio_ejecutiva": precioEjecutiva,
+        "avion_id": avionId,
       }),
     );
 

@@ -62,20 +62,49 @@ class AuthService {
     throw Exception("Usuario o contraseña incorrectos");
   }
 
+  Future<void> comprobarSesion() async {
+    final token = ApiConfig.token;
+    if (token.isEmpty) return;
+    final url = Uri.parse("${ApiConfig.baseUrl}/api/auth/session");
+    late http.Response respuesta;
+    try {
+      respuesta = await http.get(
+        url,
+        headers: {"Authorization": "Bearer $token"},
+      ).timeout(const Duration(seconds: 5));
+    } catch (_) {
+      return;
+    }
+    if (respuesta.statusCode == 401 && ApiConfig.token == token) {
+      try {
+        final error = jsonDecode(respuesta.body);
+        if (error is Map && error['codigo'] == 'SESION_EXPIRADA') {
+          await SessionService.expirar();
+          return;
+        }
+      } on FormatException {
+        // Una respuesta anterior de la API puede no incluir el código.
+      }
+      await SessionService.verificarSesion();
+      if (ApiConfig.token == token) await SessionService.cerrar();
+    }
+  }
+
   Future<void> logout() async {
+    final token = ApiConfig.token;
+    if (token.isEmpty) return;
+    await SessionService.cerrar(todasLasPestanas: true);
     final url = Uri.parse("${ApiConfig.baseUrl}/api/auth/logout");
     try {
       await http.post(
         url,
         headers: {
           "Content-Type": "application/json",
-          "Authorization": "Bearer ${ApiConfig.token}"
+          "Authorization": "Bearer $token"
         },
-      );
+      ).timeout(const Duration(seconds: 5));
     } catch (_) {
-      // Ignore network errors to ensure local logout still completes
-    } finally {
-      await SessionService.limpiar();
+      // El cierre local ya se propagó a las demás pestañas.
     }
   }
 }

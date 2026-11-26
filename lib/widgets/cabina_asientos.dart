@@ -36,6 +36,8 @@ class CabinaAsientos extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final filas = _filas;
+    final ejecutivos = asientos.where((asiento) => asiento.ejecutivo).length;
+    final filasCabina = filas.entries.toList();
     return LayoutBuilder(
       builder: (context, constraints) {
         final anchoContenido = constraints.maxWidth.clamp(0.0, 620.0);
@@ -91,17 +93,51 @@ class CabinaAsientos extends StatelessWidget {
                                 18,
                               ),
                               child: Column(
-                                children: filas.entries.map((entrada) {
-                                  return _FilaCabina(
-                                    numero: entrada.key,
-                                    asientos: entrada.value,
-                                    seleccionados: seleccionados,
-                                    reservaId: reservaId,
-                                    anchoAsiento: anchoAsiento,
-                                    anchoPasillo: anchoPasillo,
-                                    onTap: onAsientoTap,
-                                  );
-                                }).toList(),
+                                children: [
+                                  for (var i = 0;
+                                      i < filasCabina.length;
+                                      i++) ...[
+                                    if (i == 0 ||
+                                        filasCabina[i]
+                                                .value
+                                                .values
+                                                .first
+                                                .clase !=
+                                            filasCabina[i - 1]
+                                                .value
+                                                .values
+                                                .first
+                                                .clase)
+                                      _ClaseCabina(
+                                        ejecutiva: filasCabina[i]
+                                            .value
+                                            .values
+                                            .first
+                                            .ejecutivo,
+                                        cantidad: filasCabina[i]
+                                                .value
+                                                .values
+                                                .first
+                                                .ejecutivo
+                                            ? ejecutivos
+                                            : asientos.length - ejecutivos,
+                                        precio: filasCabina[i]
+                                            .value
+                                            .values
+                                            .first
+                                            .precio,
+                                      ),
+                                    _FilaCabina(
+                                      numero: filasCabina[i].key,
+                                      asientos: filasCabina[i].value,
+                                      seleccionados: seleccionados,
+                                      reservaId: reservaId,
+                                      anchoAsiento: anchoAsiento,
+                                      anchoPasillo: anchoPasillo,
+                                      onTap: onAsientoTap,
+                                    ),
+                                  ],
+                                ],
                               ),
                             ),
                             const _SalidaPosterior(),
@@ -116,6 +152,45 @@ class CabinaAsientos extends StatelessWidget {
           ),
         );
       },
+    );
+  }
+}
+
+class _ClaseCabina extends StatelessWidget {
+  final bool ejecutiva;
+  final int cantidad;
+  final double? precio;
+  const _ClaseCabina(
+      {required this.ejecutiva, required this.cantidad, this.precio});
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      width: double.infinity,
+      margin: const EdgeInsets.fromLTRB(12, 12, 12, 6),
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+      decoration: BoxDecoration(
+        color: ejecutiva ? AeroColors.navy : AeroColors.ice,
+        borderRadius: BorderRadius.circular(10),
+        border: Border.all(color: AeroColors.line),
+      ),
+      child: Wrap(
+        alignment: WrapAlignment.spaceBetween,
+        runSpacing: 4,
+        children: [
+          Text(ejecutiva ? 'Clase ejecutiva' : 'Clase turista',
+              style: TextStyle(
+                  color: ejecutiva ? Colors.white : AeroColors.ink,
+                  fontWeight: FontWeight.w800)),
+          Text(
+              precio == null
+                  ? '$cantidad asientos'
+                  : '\$${precio!.toStringAsFixed(2)} / asiento',
+              style: TextStyle(
+                  color: ejecutiva ? Colors.white : AeroColors.muted,
+                  fontSize: 12)),
+        ],
+      ),
     );
   }
 }
@@ -304,7 +379,9 @@ class _FilaCabina extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 4),
+      padding: EdgeInsets.symmetric(
+          vertical:
+              asientos.values.any((asiento) => asiento.ejecutivo) ? 7 : 4),
       child: Row(
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
